@@ -8,8 +8,8 @@ resolver = "2"
 members = [
     "crates/core",
     "crates/indicators",
-    # "crates/data",
-    # "crates/strategy-store",
+    "crates/data",
+    "crates/strategy-store",
     # "crates/strategy-generator",
     # "crates/backtest-engine",
     # "crates/strategy-converter",
@@ -70,6 +70,7 @@ polars = { version = "0.41", features = [
 ] }
 ndarray = "0.16"
 
+tempfile = "3.6"
 # ============================================================================
 # DATABASE
 # ============================================================================
@@ -155,8 +156,8 @@ statrs = "0.17"
 # ============================================================================
 darwinx-core = { path = "crates/core" }
 darwinx-indicators = { path = "crates/indicators" }
-# darwinx-data = { path = "crates/data" }
-# darwinx-store = { path = "crates/strategy-store" }
+darwinx-data = { path = "crates/data" }
+darwinx-store = { path = "crates/strategy-store" }
 # darwinx-generator = { path = "crates/strategy-generator" }
 # darwinx-backtest = { path = "crates/backtest-engine" }
 # darwinx-converter = { path = "crates/strategy-converter" }
@@ -183,5 +184,4 @@ debug = false
 panic = "abort"
 
 [profile.bench]
-inherits = "release"
 debug = true
