@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package darwinx.backtest;
+
+import "google/protobuf/empty.proto";
+
+message BacktestRequest {
+  int32 strategy_id = 1;
+  string dataset = 2;
+  string timeframe = 3;
+  string start_date = 4;
+  string end_date = 5;
+  map<string, string> config = 6;
+}
+
+message BacktestProgress {
+  string job_id = 1;
+  float progress = 2;
+  int32 current_candle = 3;
+  int32 total_candles = 4;
+}
+
+message Trade {
+  int64 entry_time = 1;
+  int64 exit_time = 2;
+  string side = 3;
+  double entry_price = 4;
+  double exit_price = 5;
+  double quantity = 6;
+  double pnl = 7;
+}
+
+message BacktestResult {
+  int32 strategy_id = 1;
+  double total_return = 2;
+  double sharpe_ratio = 3;
+  double sortino_ratio = 4;
+  double max_drawdown = 5;
+  double win_rate = 6;
+  int32 total_trades = 7;
+  repeated Trade trades = 8;
+}
+
+message BatchBacktestRequest {
+  repeated int32 strategy_ids = 1;
+  string dataset = 2;
+  int32 workers = 3;
+}
+
+message BatchProgress {
+  string job_id = 1;
+  float progress = 2;
+  int32 completed = 3;
+  int32 total = 4;
+  repeated BacktestResult partial_results = 5;
+}
+
+message GetResultRequest {
+  int32 strategy_id = 1;
+}
+
+service BacktestService {
+  rpc Run(BacktestRequest) returns (stream BacktestProgress);
+  rpc RunBatch(BatchBacktestRequest) returns (stream BatchProgress);
+  rpc GetResult(GetResultRequest) returns (BacktestResult);
+}

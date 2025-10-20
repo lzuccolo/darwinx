@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package darwinx.common;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// Vela OHLCV
+message Candle {
+  int64 timestamp = 1;
+  double open = 2;
+  double high = 3;
+  double low = 4;
+  double close = 5;
+  double volume = 6;
+}
+
+// TimeFrame
+message TimeFrame {
+  string value = 1; // "1m", "5m", "1h", etc
+}
+
+// Signal
+message Signal {
+  oneof signal_type {
+    BuySignal buy = 1;
+    SellSignal sell = 2;
+    HoldSignal hold = 3;
+  }
+}
+
+message BuySignal {
+  double price = 1;
+  double confidence = 2;
+}
+
+message SellSignal {
+  double price = 1;
+  double confidence = 2;
+}
+
+message HoldSignal {}
+
+// Position
+message Position {
+  string symbol = 1;
+  string side = 2; // "LONG" or "SHORT"
+  double entry_price = 3;
+  double quantity = 4;
+  int64 timestamp = 5;
+}
+
+// Order
+message Order {
+  string id = 1;
+  string symbol = 2;
+  string side = 3; // "BUY" or "SELL"
+  double price = 4;
+  double quantity = 5;
+  int64 timestamp = 6;
+}

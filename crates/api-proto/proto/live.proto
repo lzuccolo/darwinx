@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package darwinx.live;
+
+import "common.proto";
+
+message TradingCommand {
+  oneof command {
+    StartCommand start = 1;
+    StopCommand stop = 2;
+    PauseCommand pause = 3;
+  }
+}
+
+message StartCommand {
+  int32 strategy_id = 1;
+  string symbol = 2;
+  string mode = 3;
+}
+
+message StopCommand {
+  string reason = 1;
+}
+
+message PauseCommand {}
+
+message MarketUpdate {
+  oneof update {
+    PriceUpdate price = 1;
+    OrderUpdate order = 2;
+    PositionUpdate position = 3;
+    ErrorUpdate error = 4;
+  }
+}
+
+message PriceUpdate {
+  string symbol = 1;
+  double price = 2;
+  double volume = 3;
+  int64 timestamp = 4;
+}
+
+message OrderUpdate {
+  string order_id = 1;
+  string status = 2;
+  double filled_qty = 3;
+}
+
+message PositionUpdate {
+  string symbol = 1;
+  string side = 2;
+  double entry_price = 3;
+  double current_price = 4;
+  double pnl = 5;
+}
+
+message ErrorUpdate {
+  string message = 1;
+  string code = 2;
+}
+
+service LiveTradingService {
+  rpc Stream(stream TradingCommand) returns (stream MarketUpdate);
+}

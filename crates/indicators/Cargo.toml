@@ -1,0 +1,17 @@
+[package]
+name = "darwinx-indicators"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# No dependencies needed for basic indicators
+
+[dev-dependencies]
+criterion = "0.5"
+
+# [[bench]]
+# name = "indicators_bench"
+# harness = false
