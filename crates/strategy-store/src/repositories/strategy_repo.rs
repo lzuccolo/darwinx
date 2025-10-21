@@ -14,18 +14,18 @@ impl StrategyRepository {
 
     /// Crea una nueva estrategia
     pub async fn create(&self, strategy: &Strategy) -> Result<i64, sqlx::Error> {
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             INSERT INTO strategies (name, description, source_code, format, parameters, complexity_score)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-            "#,
-            strategy.name,
-            strategy.description,
-            strategy.source_code,
-            strategy.format,
-            strategy.parameters,
-            strategy.complexity_score
+            VALUES (?, ?, ?, ?, ?, ?)
+            "#
         )
+        .bind(&strategy.name)
+        .bind(&strategy.description)
+        .bind(&strategy.source_code)
+        .bind(&strategy.format)
+        .bind(&strategy.parameters)
+        .bind(strategy.complexity_score)
         .execute(&self.pool)
         .await?;
 
@@ -34,31 +34,28 @@ impl StrategyRepository {
 
     /// Busca una estrategia por ID
     pub async fn find_by_id(&self, id: i64) -> Result<Option<Strategy>, sqlx::Error> {
-        sqlx::query_as!(
-            Strategy,
-            r#"SELECT * FROM strategies WHERE id = ?"#,
-            id
-        )
-        .fetch_optional(&self.pool)
-        .await
+        sqlx::query_as::<_, Strategy>("SELECT * FROM strategies WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
     }
 
     /// Lista estrategias con paginación
     pub async fn list(&self, page: i32, page_size: i32) -> Result<Vec<Strategy>, sqlx::Error> {
         let offset = (page - 1) * page_size;
-        sqlx::query_as!(
-            Strategy,
-            r#"SELECT * FROM strategies ORDER BY created_at DESC LIMIT ? OFFSET ?"#,
-            page_size,
-            offset
+        sqlx::query_as::<_, Strategy>(
+            "SELECT * FROM strategies ORDER BY created_at DESC LIMIT ? OFFSET ?"
         )
+        .bind(page_size)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
     }
 
     /// Elimina una estrategia
     pub async fn delete(&self, id: i64) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query!(r#"DELETE FROM strategies WHERE id = ?"#, id)
+        let result = sqlx::query("DELETE FROM strategies WHERE id = ?")
+            .bind(id)
             .execute(&self.pool)
             .await?;
         Ok(result.rows_affected())
@@ -72,15 +69,13 @@ impl StrategyRepository {
         total_return: f64,
         max_dd: f64,
     ) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            r#"UPDATE strategies 
-               SET sharpe_ratio = ?, total_return = ?, max_drawdown = ? 
-               WHERE id = ?"#,
-            sharpe,
-            total_return,
-            max_dd,
-            id
+        sqlx::query(
+            "UPDATE strategies SET sharpe_ratio = ?, total_return = ?, max_drawdown = ? WHERE id = ?"
         )
+        .bind(sharpe)
+        .bind(total_return)
+        .bind(max_dd)
+        .bind(id)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -88,10 +83,10 @@ impl StrategyRepository {
 
     /// Cuenta el total de estrategias
     pub async fn count(&self) -> Result<i64, sqlx::Error> {
-        let result = sqlx::query!("SELECT COUNT(*) as count FROM strategies")
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM strategies")
             .fetch_one(&self.pool)
             .await?;
-        Ok(result.count as i64)
+        Ok(row.0)
     }
 }
 

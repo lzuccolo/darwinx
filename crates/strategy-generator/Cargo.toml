@@ -1,0 +1,25 @@
+[package]
+name = "darwinx-generator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+darwinx-core = { workspace = true }
+darwinx-indicators = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Random
+rand = { workspace = true }
+rand_distr = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]

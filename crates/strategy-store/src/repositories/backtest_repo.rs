@@ -14,26 +14,26 @@ impl BacktestRepository {
 
     /// Crea un nuevo resultado de backtest
     pub async fn create(&self, result: &BacktestResult) -> Result<i64, sqlx::Error> {
-        let row = sqlx::query!(
+        let row = sqlx::query(
             r#"
             INSERT INTO backtest_results 
             (strategy_id, dataset, timeframe, start_date, end_date, total_return, 
              sharpe_ratio, sortino_ratio, max_drawdown, win_rate, profit_factor, total_trades)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
-            "#,
-            result.strategy_id,
-            result.dataset,
-            result.timeframe,
-            result.start_date,
-            result.end_date,
-            result.total_return,
-            result.sharpe_ratio,
-            result.sortino_ratio,
-            result.max_drawdown,
-            result.win_rate,
-            result.profit_factor,
-            result.total_trades
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#
         )
+        .bind(result.strategy_id)
+        .bind(&result.dataset)
+        .bind(&result.timeframe)
+        .bind(&result.start_date)
+        .bind(&result.end_date)
+        .bind(result.total_return)
+        .bind(result.sharpe_ratio)
+        .bind(result.sortino_ratio)
+        .bind(result.max_drawdown)
+        .bind(result.win_rate)
+        .bind(result.profit_factor)
+        .bind(result.total_trades)
         .execute(&self.pool)
         .await?;
 
@@ -45,11 +45,10 @@ impl BacktestRepository {
         &self,
         strategy_id: i64,
     ) -> Result<Vec<BacktestResult>, sqlx::Error> {
-        sqlx::query_as!(
-            BacktestResult,
-            r#"SELECT * FROM backtest_results WHERE strategy_id = ? ORDER BY tested_at DESC"#,
-            strategy_id
+        sqlx::query_as::<_, BacktestResult>(
+            "SELECT * FROM backtest_results WHERE strategy_id = ? ORDER BY tested_at DESC"
         )
+        .bind(strategy_id)
         .fetch_all(&self.pool)
         .await
     }
@@ -59,37 +58,30 @@ impl BacktestRepository {
         &self,
         strategy_id: i64,
     ) -> Result<Option<BacktestResult>, sqlx::Error> {
-        sqlx::query_as!(
-            BacktestResult,
-            r#"SELECT * FROM backtest_results 
-               WHERE strategy_id = ? 
-               ORDER BY tested_at DESC 
-               LIMIT 1"#,
-            strategy_id
+        sqlx::query_as::<_, BacktestResult>(
+            "SELECT * FROM backtest_results WHERE strategy_id = ? ORDER BY tested_at DESC LIMIT 1"
         )
+        .bind(strategy_id)
         .fetch_optional(&self.pool)
         .await
     }
 
     /// Lista los mejores resultados por Sharpe Ratio
     pub async fn top_by_sharpe(&self, limit: i32) -> Result<Vec<BacktestResult>, sqlx::Error> {
-        sqlx::query_as!(
-            BacktestResult,
-            r#"SELECT * FROM backtest_results 
-               ORDER BY sharpe_ratio DESC 
-               LIMIT ?"#,
-            limit
+        sqlx::query_as::<_, BacktestResult>(
+            "SELECT * FROM backtest_results ORDER BY sharpe_ratio DESC LIMIT ?"
         )
+        .bind(limit)
         .fetch_all(&self.pool)
         .await
     }
 
     /// Cuenta resultados de backtest
     pub async fn count(&self) -> Result<i64, sqlx::Error> {
-        let result = sqlx::query!("SELECT COUNT(*) as count FROM backtest_results")
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM backtest_results")
             .fetch_one(&self.pool)
             .await?;
-        Ok(result.count as i64)
+        Ok(row.0)
     }
 }
 

@@ -28,3 +28,18 @@ darwinx/
 ├── strategies/
 ├── logs/
 └── docs/
+
+crates/strategy-generator/
+├── Cargo.toml
+└── src/
+    ├── lib.rs
+    ├── ast.rs              ← AST nodes y builder
+    ├── ast/
+    │   ├── nodes.rs
+    │   ├── builder.rs
+    │   └── validator.rs
+    ├── generator.rs        ← Generadores
+    ├── generator/
+    │   ├── random.rs
+    │   └── genetic.rs
+    └── constraints.rs      ← Validaciones

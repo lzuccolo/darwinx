@@ -8,6 +8,7 @@ license.workspace = true
 
 [dependencies]
 # No dependencies needed for basic indicators
+serde = { workspace = true }
 
 [dev-dependencies]
 criterion = "0.5"

@@ -4,7 +4,7 @@
 //!
 //! Todos los indicadores son funciones puras que operan sobre slices
 //! de precios, permitiendo máxima eficiencia y reutilización.
-
+pub mod metadata;
 pub mod trend;
 pub mod momentum;
 pub mod volatility;
