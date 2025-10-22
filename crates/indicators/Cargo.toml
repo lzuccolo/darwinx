@@ -9,6 +9,9 @@ license.workspace = true
 [dependencies]
 # No dependencies needed for basic indicators
 serde = { workspace = true }
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+ctor = { workspace = true }
 
 [dev-dependencies]
 criterion = "0.5"

@@ -1,7 +1,9 @@
+use crate::register_indicator;
+
 /// Metadata del indicador SMA
 pub fn metadata() -> crate::metadata::IndicatorMetadata {
     use crate::metadata::*;
-    
+
     IndicatorMetadata::new("sma")
         .category(IndicatorCategory::Trend)
         .input_type(InputType::PriceSeries)
@@ -26,6 +28,8 @@ pub fn sma(data: &[f64], period: usize) -> Option<f64> {
     let sum: f64 = data.iter().rev().take(period).sum();
     Some(sum / period as f64)
 }
+
+register_indicator!(metadata);
 
 #[cfg(test)]
 mod tests {

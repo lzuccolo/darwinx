@@ -1,4 +1,5 @@
-/// Metadata del indicador VWMA
+use crate::register_indicator;
+
 pub fn metadata() -> crate::metadata::IndicatorMetadata {
     use crate::metadata::*;
     
@@ -30,4 +31,44 @@ pub fn vwma(prices: &[f64], volumes: &[f64], period: usize) -> Option<f64> {
     }
     
     Some(sum_pv / sum_v)
+}
+
+register_indicator!(metadata);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metadata() {
+        let meta = metadata();
+        assert_eq!(meta.name, "vwma");
+        assert_eq!(meta.parameters.len(), 1);
+        assert_eq!(meta.parameters[0].name, "period");
+    }
+
+    #[test]
+    fn test_vwma() {
+        let prices = vec![10.0, 11.0, 12.0, 11.5, 13.0];
+        let volumes = vec![100.0, 150.0, 120.0, 200.0, 180.0];
+        
+        let result = vwma(&prices, &volumes, 5);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_vwma_insufficient_data() {
+        let prices = vec![10.0, 11.0];
+        let volumes = vec![100.0, 150.0];
+        
+        assert!(vwma(&prices, &volumes, 5).is_none());
+    }
+
+    #[test]
+    fn test_vwma_zero_volume() {
+        let prices = vec![10.0, 11.0, 12.0];
+        let volumes = vec![0.0, 0.0, 0.0];
+        
+        assert!(vwma(&prices, &volumes, 3).is_none());
+    }
 }
