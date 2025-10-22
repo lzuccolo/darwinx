@@ -1,0 +1,728 @@
+🔍 Extrayendo código de DarwinX...
+Fecha: Wed Oct 22 05:34:51 PM -03 2025
+======================================
+
+
+========================================
+📄 FILE: crates/indicators/src/lib.rs
+========================================
+//! # DarwinX Indicators
+//!
+//! Librería de indicadores técnicos para análisis de mercado.
+//!
+//! Todos los indicadores son funciones puras que operan sobre slices
+//! de precios, permitiendo máxima eficiencia y reutilización.
+pub mod metadata;
+pub mod trend;
+pub mod momentum;
+pub mod volatility;
+pub mod volume;
+
+// Re-exports de indicadores más comunes
+pub use trend::{ema, sma, wma, vwma};
+pub use momentum::{rsi, macd, stochastic, roc};
+pub use volatility::{atr, bollinger, keltner};
+pub use volume::{obv, mfi, vwap};
+
+
+========================================
+📄 FILE: crates/indicators/src/metadata.rs
+========================================
+//! Metadata de indicadores
+
+use serde::{Deserialize, Serialize};
+
+/// Categoría de indicador
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum IndicatorCategory {
+    Trend,
+    Momentum,
+    Volatility,
+    Volume,
+    CandlePattern,
+}
+
+/// Tipo de input que necesita el indicador
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum InputType {
+    /// Serie de precios (close, open, etc.)
+    PriceSeries,
+    /// Serie de velas completas
+    CandleSeries,
+    /// Múltiples series (precio + volumen, etc.)
+    MultiSeries,
+}
+
+/// Tipo de parámetro
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ParamType {
+    /// Período (número de velas)
+    Period,
+    /// Multiplicador
+    Multiplier,
+    /// Porcentaje (0.0 - 1.0)
+    Percentage,
+    /// Valor arbitrario
+    Value,
+}
+
+/// Definición de un parámetro
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParameterDef {
+    pub name: &'static str,
+    pub param_type: ParamType,
+    pub min: f64,
+    pub max: f64,
+    pub default: f64,
+    pub description: &'static str,
+}
+
+impl ParameterDef {
+    /// Constructor para período
+    pub fn period(name: &'static str, min: f64, max: f64, default: f64) -> Self {
+        Self {
+            name,
+            param_type: ParamType::Period,
+            min,
+            max,
+            default,
+            description: "Period in candles",
+        }
+    }
+
+    /// Constructor para multiplicador
+    pub fn multiplier(name: &'static str, min: f64, max: f64, default: f64) -> Self {
+        Self {
+            name,
+            param_type: ParamType::Multiplier,
+            min,
+            max,
+            default,
+            description: "Multiplier value",
+        }
+    }
+
+    /// Constructor para porcentaje
+    pub fn percentage(name: &'static str, min: f64, max: f64, default: f64) -> Self {
+        Self {
+            name,
+            param_type: ParamType::Percentage,
+            min,
+            max,
+            default,
+            description: "Percentage (0.0 - 1.0)",
+        }
+    }
+}
+
+/// Metadata de un indicador
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndicatorMetadata {
+    pub name: &'static str,
+    pub category: IndicatorCategory,
+    pub input_type: InputType,
+    pub lookback: usize,
+    pub parameters: Vec<ParameterDef>,
+    pub description: &'static str,
+}
+
+impl IndicatorMetadata {
+    /// Crea metadata con builder pattern
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            name,
+            category: IndicatorCategory::Trend,
+            input_type: InputType::PriceSeries,
+            lookback: 1,
+            parameters: Vec::new(),
+            description: "",
+        }
+    }
+
+    /// Define la categoría
+    pub fn category(mut self, category: IndicatorCategory) -> Self {
+        self.category = category;
+        self
+    }
+
+    /// Define el tipo de input
+    pub fn input_type(mut self, input_type: InputType) -> Self {
+        self.input_type = input_type;
+        self
+    }
+
+    /// Define cuántas velas necesita mirar atrás
+    pub fn lookback(mut self, lookback: usize) -> Self {
+        self.lookback = lookback;
+        self
+    }
+
+    /// Agrega un parámetro
+    pub fn parameter(mut self, param: ParameterDef) -> Self {
+        self.parameters.push(param);
+        self
+    }
+
+    /// Define la descripción
+    pub fn description(mut self, description: &'static str) -> Self {
+        self.description = description;
+        self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_builder_pattern() {
+        let metadata = IndicatorMetadata::new("sma")
+            .category(IndicatorCategory::Trend)
+            .input_type(InputType::PriceSeries)
+            .lookback(1)
+            .parameter(ParameterDef::period("period", 2.0, 200.0, 20.0))
+            .description("Simple Moving Average");
+
+        assert_eq!(metadata.name, "sma");
+        assert_eq!(metadata.category, IndicatorCategory::Trend);
+        assert_eq!(metadata.parameters.len(), 1);
+    }
+
+    #[test]
+    fn test_parameter_constructors() {
+        let period = ParameterDef::period("period", 2.0, 50.0, 14.0);
+        assert_eq!(period.param_type, ParamType::Period);
+        assert_eq!(period.default, 14.0);
+
+        let mult = ParameterDef::multiplier("mult", 1.0, 5.0, 2.0);
+        assert_eq!(mult.param_type, ParamType::Multiplier);
+    }
+}
+
+========================================
+📄 FILE: crates/indicators/Cargo.toml
+========================================
+[package]
+name = "darwinx-indicators"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# No dependencies needed for basic indicators
+serde = { workspace = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
+# [[bench]]
+# name = "indicators_bench"
+# harness = false
+
+========================================
+📄 FILE: crates/indicators/src/trend/sma.rs
+========================================
+/// Metadata del indicador SMA
+pub fn metadata() -> crate::metadata::IndicatorMetadata {
+    use crate::metadata::*;
+    
+    IndicatorMetadata::new("sma")
+        .category(IndicatorCategory::Trend)
+        .input_type(InputType::PriceSeries)
+        .lookback(1)
+        .parameter(ParameterDef::period("period", 2.0, 200.0, 20.0))
+        .description("Simple Moving Average")
+}
+
+/// Calcula la media móvil simple
+///
+/// # Arguments
+/// * `data` - Slice de precios
+/// * `period` - Número de períodos
+///
+/// # Returns
+/// * `Some(f64)` si hay suficientes datos
+/// * `None` si no hay suficientes datos
+pub fn sma(data: &[f64], period: usize) -> Option<f64> {
+    if data.len() < period {
+        return None;
+    }
+    let sum: f64 = data.iter().rev().take(period).sum();
+    Some(sum / period as f64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metadata() {
+        let meta = metadata();
+        assert_eq!(meta.name, "sma");
+        assert_eq!(meta.parameters.len(), 1);
+        assert_eq!(meta.parameters[0].name, "period");
+    }
+
+    #[test]
+    fn test_sma() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        assert_eq!(sma(&data, 5), Some(3.0));
+        assert_eq!(sma(&data, 3), Some(4.0)); // (3+4+5)/3
+    }
+
+    #[test]
+    fn test_sma_insufficient_data() {
+        let data = vec![1.0, 2.0];
+        assert_eq!(sma(&data, 5), None);
+    }
+}
+
+========================================
+📄 FILE: crates/indicators/src/momentum/rsi.rs
+========================================
+pub fn rsi(data: &[f64], period: usize) -> Option<f64> {
+    if data.len() < period + 1 {
+        return None;
+    }
+    
+    let mut gains = 0.0;
+    let mut losses = 0.0;
+    
+    for i in 1..=period {
+        let change = data[data.len() - i] - data[data.len() - i - 1];
+        if change > 0.0 {
+            gains += change;
+        } else {
+            losses -= change;
+        }
+    }
+    
+    let avg_gain = gains / period as f64;
+    let avg_loss = losses / period as f64;
+    
+    if avg_loss == 0.0 {
+        return Some(100.0);
+    }
+    
+    let rs = avg_gain / avg_loss;
+    Some(100.0 - (100.0 / (1.0 + rs)))
+}
+
+
+========================================
+📄 FILE: crates/indicators/src/volatility/bollinger.rs
+========================================
+use crate::trend::sma;
+
+/// Calcula las Bandas de Bollinger
+/// Retorna (lower, middle, upper)
+pub fn bollinger_bands(data: &[f64], period: usize, std_dev: f64) -> Option<(f64, f64, f64)> {
+    let sma_val = sma(data, period)?;
+    
+    let variance: f64 = data.iter()
+        .rev()
+        .take(period)
+        .map(|x| (x - sma_val).powi(2))
+        .sum::<f64>() / period as f64;
+    
+    let std = variance.sqrt();
+    
+    Some((
+        sma_val - std_dev * std,
+        sma_val,
+        sma_val + std_dev * std,
+    ))
+}
+
+
+========================================
+📄 FILE: crates/indicators/src/volume/obv.rs
+========================================
+pub fn obv(close: &[f64], volume: &[f64]) -> Option<Vec<f64>> {
+    if close.len() != volume.len() || close.len() < 2 {
+        return None;
+    }
+    
+    let mut obv_values = vec![volume[0]];
+    
+    for i in 1..close.len() {
+        let prev_obv = obv_values[i - 1];
+        if close[i] > close[i - 1] {
+            obv_values.push(prev_obv + volume[i]);
+        } else if close[i] < close[i - 1] {
+            obv_values.push(prev_obv - volume[i]);
+        } else {
+            obv_values.push(prev_obv);
+        }
+    }
+    
+    Some(obv_values)
+}
+
+
+========================================
+📄 FILE: crates/indicators/src/trend.rs
+========================================
+//! Indicadores de tendencia
+
+pub mod sma;
+pub mod ema;
+pub mod wma;
+pub mod vwma;
+
+// Re-exports
+pub use self::ema::ema;
+pub use self::sma::sma;
+pub use self::wma::wma;
+pub use self::vwma::vwma;
+
+========================================
+📄 FILE: crates/indicators/src/momentum.rs
+========================================
+// ============================================================================
+// crates/indicators/src/momentum.rs
+// ============================================================================
+
+//! Indicadores de momentum
+
+pub mod rsi;
+pub mod macd;
+pub mod stochastic;
+pub mod roc;
+
+pub use self::rsi::rsi;
+pub use self::macd::macd;
+
+========================================
+📄 FILE: crates/strategy-generator/src/lib.rs
+========================================
+//! # DarwinX Strategy Generator
+//!
+//! Generador de estrategias de trading usando algoritmos genéticos
+
+pub mod ast;
+pub mod generator;
+pub mod constraints;
+
+// Re-exports
+pub use ast::nodes::{StrategyAST, Condition, IndicatorType};
+pub use generator::random::RandomGenerator;
+pub use constraints::StrategyConstraints;
+
+========================================
+📄 FILE: crates/strategy-generator/src/generator/random.rs
+========================================
+//! Generador aleatorio de estrategias
+
+use crate::ast::nodes::*;
+use darwinx_core::TimeFrame;
+use rand::Rng;
+
+pub struct RandomGenerator {
+    max_conditions: usize,
+    max_indicators: usize,
+}
+
+impl RandomGenerator {
+    pub fn new() -> Self {
+        Self {
+            max_conditions: 5,
+            max_indicators: 3,
+        }
+    }
+
+    pub fn with_constraints(max_conditions: usize, max_indicators: usize) -> Self {
+        Self {
+            max_conditions,
+            max_indicators,
+        }
+    }
+
+    /// Genera una estrategia aleatoria
+    pub fn generate(&self, name: String) -> StrategyAST {
+        let mut rng = rand::thread_rng();
+
+        let timeframe = self.random_timeframe(&mut rng);
+        let mut strategy = StrategyAST::new(name, timeframe);
+
+        // Generar condiciones de entrada
+        let entry_count = rng.gen_range(1..=self.max_conditions.min(3));
+        for _ in 0..entry_count {
+            strategy.entry_rules.conditions.push(self.random_condition(&mut rng));
+        }
+
+        // Operador de entrada
+        strategy.entry_rules.operator = if rng.gen_bool(0.7) {
+            LogicalOperator::And
+        } else {
+            LogicalOperator::Or
+        };
+
+        // Generar condiciones de salida
+        let exit_count = rng.gen_range(1..=self.max_conditions.min(2));
+        for _ in 0..exit_count {
+            strategy.exit_rules.conditions.push(self.random_condition(&mut rng));
+        }
+
+        strategy.exit_rules.operator = LogicalOperator::Or;
+
+        strategy
+    }
+
+    /// Genera múltiples estrategias
+    pub fn generate_batch(&self, count: usize) -> Vec<StrategyAST> {
+        (0..count)
+            .map(|i| self.generate(format!("Strategy_{}", i)))
+            .collect()
+    }
+
+    fn random_timeframe(&self, rng: &mut impl Rng) -> TimeFrame {
+        let timeframes = [
+            TimeFrame::M5,
+            TimeFrame::M15,
+            TimeFrame::M30,
+            TimeFrame::H1,
+            TimeFrame::H4,
+        ];
+        timeframes[rng.gen_range(0..timeframes.len())]
+    }
+
+    fn random_condition(&self, rng: &mut impl Rng) -> Condition {
+        let indicator = self.random_indicator(rng);
+        let comparison = self.random_comparison(rng);
+        let value = self.random_value(rng);
+
+        Condition {
+            indicator,
+            comparison,
+            value,
+        }
+    }
+
+    fn random_indicator(&self, rng: &mut impl Rng) -> IndicatorType {
+        match rng.gen_range(0..6) {
+            0 => IndicatorType::Sma {
+                period: rng.gen_range(5..=50),
+            },
+            1 => IndicatorType::Ema {
+                period: rng.gen_range(5..=50),
+            },
+            2 => IndicatorType::Rsi {
+                period: rng.gen_range(7..=21),
+            },
+            3 => IndicatorType::Macd {
+                fast: 12,
+                slow: 26,
+                signal: 9,
+            },
+            4 => IndicatorType::BollingerBands {
+                period: 20,
+                std_dev: 2.0,
+            },
+            _ => IndicatorType::Atr {
+                period: rng.gen_range(10..=20),
+            },
+        }
+    }
+
+    fn random_comparison(&self, rng: &mut impl Rng) -> Comparison {
+        match rng.gen_range(0..5) {
+            0 => Comparison::GreaterThan,
+            1 => Comparison::LessThan,
+            2 => Comparison::CrossesAbove,
+            3 => Comparison::CrossesBelow,
+            _ => Comparison::Equals,
+        }
+    }
+
+    fn random_value(&self, rng: &mut impl Rng) -> ConditionValue {
+        match rng.gen_range(0..3) {
+            0 => ConditionValue::Number(rng.gen_range(20.0..80.0)),
+            1 => ConditionValue::Price,
+            _ => ConditionValue::Indicator(self.random_indicator(rng)),
+        }
+    }
+}
+
+impl Default for RandomGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_single() {
+        let generator = RandomGenerator::new();
+        let strategy = generator.generate("Test".to_string());
+
+        assert_eq!(strategy.name, "Test");
+        assert!(!strategy.entry_rules.conditions.is_empty());
+        assert!(!strategy.exit_rules.conditions.is_empty());
+        assert!(strategy.complexity() > 0);
+    }
+
+    #[test]
+    fn test_generate_batch() {
+        let generator = RandomGenerator::new();
+        let strategies = generator.generate_batch(10);
+
+        assert_eq!(strategies.len(), 10);
+        
+        // Verificar que son diferentes
+        let complexities: Vec<_> = strategies.iter().map(|s| s.complexity()).collect();
+        assert!(complexities.iter().any(|&c| c != complexities[0]));
+    }
+
+    #[test]
+    fn test_constraints() {
+        let generator = RandomGenerator::with_constraints(2, 2);
+        let strategy = generator.generate("Test".to_string());
+
+        assert!(strategy.entry_rules.conditions.len() <= 2);
+        assert!(strategy.exit_rules.conditions.len() <= 2);
+    }
+}
+
+========================================
+📄 FILE: crates/strategy-generator/Cargo.toml
+========================================
+[package]
+name = "darwinx-generator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+darwinx-core = { workspace = true }
+darwinx-indicators = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Random
+rand = { workspace = true }
+rand_distr = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+
+========================================
+📄 FILE: crates/core/src/types/candle.rs
+========================================
+use serde::{Deserialize, Serialize};
+
+/// Vela de precio (candlestick)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Candle {
+    /// Timestamp en milisegundos (Unix epoch)
+    pub timestamp: i64,
+
+    /// Precio de apertura
+    pub open: f64,
+
+    /// Precio máximo
+    pub high: f64,
+
+    /// Precio mínimo
+    pub low: f64,
+
+    /// Precio de cierre
+    pub close: f64,
+
+    /// Volumen negociado
+    pub volume: f64,
+}
+
+impl Candle {
+    /// Crea una nueva vela
+    pub fn new(timestamp: i64, open: f64, high: f64, low: f64, close: f64, volume: f64) -> Self {
+        Self {
+            timestamp,
+            open,
+            high,
+            low,
+            close,
+            volume,
+        }
+    }
+
+    /// Retorna el precio típico (high + low + close) / 3
+    pub fn typical_price(&self) -> f64 {
+        (self.high + self.low + self.close) / 3.0
+    }
+
+    /// Retorna true si la vela es alcista (cierre > apertura)
+    pub fn is_bullish(&self) -> bool {
+        self.close > self.open
+    }
+
+    /// Retorna true si la vela es bajista (cierre < apertura)
+    pub fn is_bearish(&self) -> bool {
+        self.close < self.open
+    }
+
+    /// Retorna el rango de la vela (high - low)
+    pub fn range(&self) -> f64 {
+        self.high - self.low
+    }
+
+    /// Retorna el cuerpo de la vela (|close - open|)
+    pub fn body(&self) -> f64 {
+        (self.close - self.open).abs()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_candle_creation() {
+        let candle = Candle::new(1000, 100.0, 105.0, 95.0, 102.0, 1000.0);
+        assert_eq!(candle.timestamp, 1000);
+        assert_eq!(candle.open, 100.0);
+        assert_eq!(candle.close, 102.0);
+    }
+
+    #[test]
+    fn test_typical_price() {
+        let candle = Candle::new(1000, 100.0, 110.0, 90.0, 105.0, 1000.0);
+        let expected = (110.0 + 90.0 + 105.0) / 3.0;
+        assert_eq!(candle.typical_price(), expected);
+    }
+
+    #[test]
+    fn test_bullish_bearish() {
+        let bullish = Candle::new(1000, 100.0, 105.0, 95.0, 102.0, 1000.0);
+        assert!(bullish.is_bullish());
+        assert!(!bullish.is_bearish());
+
+        let bearish = Candle::new(1000, 100.0, 105.0, 95.0, 98.0, 1000.0);
+        assert!(!bearish.is_bullish());
+        assert!(bearish.is_bearish());
+    }
+
+    #[test]
+    fn test_range_and_body() {
+        let candle = Candle::new(1000, 100.0, 110.0, 90.0, 105.0, 1000.0);
+        assert_eq!(candle.range(), 20.0);
+        assert_eq!(candle.body(), 5.0);
+    }
+}
+
+======================================
+✅ Extracción completada
+Archivo generado: /home/shared/trading/src/darwinx/tmp/darwinx_code_snapshot.txt
+📊 Tamaño: 19K
