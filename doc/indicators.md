@@ -1,12 +1,3 @@
-Me gusta esta opción.
-Pero tengo una última pregunta:
-en la propia impl de indicator, no puede estar el registro? Ventajas y desventajas
-
-
------------------------------------------
-
-Excelente punto! Sí, absolutamente. Es mucho mejor que cada indicador se auto-registre en su propio archivo. Así mantienes la cohesión y evitas un archivo registry.rs gigante.
-
 🎯 PROPUESTA MEJORADA: Auto-registro Descentralizado
 OPCIÓN A: Lazy Static con Auto-registro por archivo ⭐⭐⭐⭐⭐
 Cada indicador se registra a sí mismo usando ctor (constructor) macro.
@@ -19,12 +10,10 @@ indicators/
 │   ├── types.rs             
 │   ├── trait.rs             
 │   ├── trend/
-│   │   ├── mod.rs
 │   │   ├── sma.rs           ← 🎯 Se auto-registra aquí
 │   │   ├── ema.rs           ← 🎯 Se auto-registra aquí
 │   │   └── ...
 │   ├── momentum/
-│   │   ├── mod.rs
 │   │   ├── rsi.rs           ← 🎯 Se auto-registra aquí
 │   │   └── ...
 │   ├── volatility/
@@ -402,7 +391,7 @@ register_indicator! {
     }
 }
 
-// 2. Agregar en indicators/src/momentum/mod.rs
+// 2. Agregar en indicators/src/momentum/
 pub mod cci;
 pub use cci::CCI;
 
@@ -446,12 +435,5 @@ Lo que obtienes:
 ✅ Thread-safe con RwLock
 ✅ Compile-time registration con ctor
 
-¿Procedo con la implementación completa de esta versión mejorada? 🚀
-Incluiría:
 
-indicators/src/types.rs
-indicators/src/registry.rs
-indicators/src/macros.rs
-indicators/src/trait.rs
-Ejemplos completos de 5-10 indicadores
-Tests
+
