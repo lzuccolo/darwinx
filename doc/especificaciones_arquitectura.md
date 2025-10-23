@@ -369,7 +369,7 @@ rustpub struct StrategyConstraints {
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │              EVENT-DRIVEN ENGINE (Opcional)               │  │
+│  │              EVENT-DRIVEN ENGINE                         │  │
 │  │  • Simulación tick-by-tick                                │  │
 │  │  • Order book simulation                                  │  │
 │  │  • Slippage realista                                      │  │
