@@ -34,15 +34,60 @@ pub struct Condition {
     pub value: ConditionValue,
 }
 
-/// Tipos de indicadores
+/// 🎯 NUEVO: Indicador dinámico (funciona con cualquier indicador del registry)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum IndicatorType {
-    Sma { period: usize },
-    Ema { period: usize },
-    Rsi { period: usize },
-    Macd { fast: usize, slow: usize, signal: usize },
-    BollingerBands { period: usize, std_dev: f64 },
-    Atr { period: usize },
+pub struct IndicatorType {
+    /// Nombre del indicador (ej: "sma", "rsi", "macd")
+    pub name: String,
+    
+    /// Parámetros del indicador en orden
+    /// Ejemplo: 
+    /// - SMA: [20.0] (period)
+    /// - MACD: [12.0, 26.0, 9.0] (fast, slow, signal)
+    /// - Bollinger: [20.0, 2.0] (period, std_dev)
+    pub params: Vec<f64>,
+}
+
+impl IndicatorType {
+    /// Crea un nuevo indicador
+    pub fn new(name: impl Into<String>, params: Vec<f64>) -> Self {
+        Self {
+            name: name.into(),
+            params,
+        }
+    }
+    
+    /// Constructor conveniente para indicadores con 1 parámetro (period)
+    pub fn with_period(name: impl Into<String>, period: usize) -> Self {
+        Self {
+            name: name.into(),
+            params: vec![period as f64],
+        }
+    }
+    
+    /// Retorna el nombre del indicador
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    
+    /// Retorna los parámetros
+    pub fn params(&self) -> &[f64] {
+        &self.params
+    }
+    
+    /// Retorna una representación legible
+    pub fn display(&self) -> String {
+        if self.params.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{}({})", self.name, 
+                self.params.iter()
+                    .map(|p| format!("{:.1}", p))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
+    }
 }
 
 /// Comparación
@@ -101,11 +146,23 @@ mod tests {
         let mut strategy = StrategyAST::new("Test".to_string(), TimeFrame::H1);
         
         strategy.entry_rules.conditions.push(Condition {
-            indicator: IndicatorType::Rsi { period: 14 },
+            indicator: IndicatorType::with_period("rsi", 14),
             comparison: Comparison::GreaterThan,
             value: ConditionValue::Number(50.0),
         });
         
         assert_eq!(strategy.complexity(), 1);
+    }
+
+    #[test]
+    fn test_indicator_display() {
+        let sma = IndicatorType::with_period("sma", 20);
+        assert_eq!(sma.display(), "sma(20.0)");
+        
+        let macd = IndicatorType::new("macd", vec![12.0, 26.0, 9.0]);
+        assert_eq!(macd.display(), "macd(12.0, 26.0, 9.0)");
+        
+        let obv = IndicatorType::new("obv", vec![]);
+        assert_eq!(obv.display(), "obv");
     }
 }

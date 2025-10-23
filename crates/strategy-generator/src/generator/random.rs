@@ -2,7 +2,8 @@
 
 use crate::ast::nodes::*;
 use darwinx_core::TimeFrame;
-use rand::Rng;
+use darwinx_indicators::registry;
+use rand::prelude::*;
 
 pub struct RandomGenerator {
     max_conditions: usize,
@@ -85,30 +86,31 @@ impl RandomGenerator {
         }
     }
 
+    /// 🎯 100% DINÁMICO: Usa registry para cualquier indicador
     fn random_indicator(&self, rng: &mut impl Rng) -> IndicatorType {
-        match rng.gen_range(0..6) {
-            0 => IndicatorType::Sma {
-                period: rng.gen_range(5..=50),
-            },
-            1 => IndicatorType::Ema {
-                period: rng.gen_range(5..=50),
-            },
-            2 => IndicatorType::Rsi {
-                period: rng.gen_range(7..=21),
-            },
-            3 => IndicatorType::Macd {
-                fast: 12,
-                slow: 26,
-                signal: 9,
-            },
-            4 => IndicatorType::BollingerBands {
-                period: 20,
-                std_dev: 2.0,
-            },
-            _ => IndicatorType::Atr {
-                period: rng.gen_range(10..=20),
-            },
+        // Obtener todos los indicadores del registry
+        let available = registry::all_names();
+        
+        if available.is_empty() {
+            // Fallback: crear SMA por defecto
+            return IndicatorType::with_period("sma", 20);
         }
+        
+        // Seleccionar uno aleatorio
+        let selected_name = available.choose(rng).unwrap();
+        
+        // Obtener metadata del indicador
+        let meta = registry::get(selected_name)
+            .expect("Indicator should be registered");
+        
+        // Generar parámetros aleatorios basados en metadata
+        let params: Vec<f64> = meta.parameters
+            .iter()
+            .map(|param_def| rng.gen_range(param_def.min..=param_def.max))
+            .collect();
+        
+        // Crear indicador dinámico
+        IndicatorType::new(selected_name.to_string(), params)
     }
 
     fn random_comparison(&self, rng: &mut impl Rng) -> Comparison {
@@ -170,5 +172,20 @@ mod tests {
 
         assert!(strategy.entry_rules.conditions.len() <= 2);
         assert!(strategy.exit_rules.conditions.len() <= 2);
+    }
+
+    #[test]
+    fn test_uses_registry() {
+        let generator = RandomGenerator::new();
+        
+        // Generar múltiples estrategias
+        let strategies = generator.generate_batch(50);
+        
+        // Verificar que usa indicadores del registry
+        let available = registry::all_names();
+        assert!(!available.is_empty(), "Registry should have indicators");
+        
+        // Debería haber variedad de indicadores
+        assert!(strategies.len() > 0);
     }
 }
