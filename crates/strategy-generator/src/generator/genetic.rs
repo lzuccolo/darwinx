@@ -1,11 +1,36 @@
 //! Algoritmo genético - 100% DINÁMICO usando registry
+//!
+//! Este módulo implementa un algoritmo genético completo para evolucionar
+//! estrategias de trading, incluyendo selección por torneo, crossover,
+//! mutación y elitismo.
 
 use crate::ast::nodes::*;
 use crate::generator::random::RandomGenerator;
 use darwinx_indicators::registry;
 use rand::prelude::*;
 
-/// Configuración del algoritmo genético
+// Configuración del algoritmo genético
+//
+// Controla el comportamiento del proceso evolutivo, incluyendo el tamaño de la
+// población, número de generaciones, y tasas de mutación y elitismo.
+//
+// # Ejemplos
+//
+// ```
+// use darwinx_generator::GeneticConfig;
+//
+// // Configuración por defecto
+// let config = GeneticConfig::default();
+//
+// // Configuración personalizada para evolución rápida
+// let quick_config = GeneticConfig {
+//     population_size: 30,
+//     generations: 20,
+//     mutation_rate: 0.2,
+//     elite_size: 3,
+//     tournament_size: 3,
+// };
+// ```
 #[derive(Debug, Clone)]
 pub struct GeneticConfig {
     pub population_size: usize,
@@ -27,13 +52,46 @@ impl Default for GeneticConfig {
     }
 }
 
-/// Generador genético de estrategias
+// Generador genético de estrategias de trading
+//
+// Implementa un algoritmo genético completo para evolucionar estrategias de trading
+// usando selección por torneo, crossover, mutación y elitismo.
+//
+// # Características
+//
+// - **100% dinámico**: Usa el registry de indicadores sin hardcoding
+// - **5 tipos de mutación**: Condiciones, parámetros, operadores, comparadores
+// - **Elitismo configurable**: Preserva las mejores estrategias
+// - **Convergencia anticipada**: Detecta estancamiento y termina antes
+//
+// # Ejemplos
+//
+// ```no_run
+// use darwinx_generator::{GeneticGenerator, GeneticConfig};
+//
+// let config = GeneticConfig::default();
+// let generator = GeneticGenerator::new(config);
+//
+// let population = generator.generate_population(100);
+//
+// let fitness_fn = |strategy| {
+//     strategy.complexity() as f64
+// };
+//
+// let best = generator.evolve(population, fitness_fn);
+// println!("Mejor estrategia: {}", best[0].name);
+// ```
 pub struct GeneticGenerator {
     config: GeneticConfig,
     random_gen: RandomGenerator,
 }
 
 impl GeneticGenerator {
+    // Crea un nuevo generador genético con la configuración especificada
+    //
+    // # Argumentos
+    //
+    // * `config` - Configuración del algoritmo genético
     pub fn new(config: GeneticConfig) -> Self {
         Self {
             config,
@@ -41,12 +99,35 @@ impl GeneticGenerator {
         }
     }
 
-    /// Genera población inicial
+    // Genera una población inicial de estrategias aleatorias
+    //
+    // Utiliza el generador aleatorio interno para crear estrategias válidas
+    // que respetan los constraints configurados.
+    //
+    // # Argumentos
+    //
+    // * `count` - Número de estrategias a generar
+    //
+    // # Returns
+    //
+    // Vector con `count` estrategias válidas generadas aleatoriamente
     pub fn generate_population(&self, count: usize) -> Vec<StrategyAST> {
         self.random_gen.generate_batch(count)
     }
 
-    /// Cruza dos estrategias (crossover)
+    // Cruza dos estrategias padre para crear un hijo (crossover)
+    //
+    // Implementa crossover de un punto para las condiciones de entrada,
+    // y selección aleatoria para las condiciones de salida y operadores lógicos.
+    //
+    // # Argumentos
+    //
+    // * `parent1` - Primera estrategia padre
+    // * `parent2` - Segunda estrategia padre
+    //
+    // # Returns
+    //
+    // Nueva estrategia (hijo) que combina características de ambos padres
     pub fn crossover(&self, parent1: &StrategyAST, parent2: &StrategyAST) -> StrategyAST {
         let mut rng = rand::thread_rng();
         let mut child = StrategyAST::new(
@@ -83,13 +164,19 @@ impl GeneticGenerator {
         child
     }
 
-    /// Muta una estrategia
-    /// 
-    /// Tipos de mutación:
-    /// 1. Reemplazar condición completa
-    /// 2. Mutar parámetros de un indicador existente
-    /// 3. Cambiar operador lógico
-    /// 4. Cambiar comparador
+    // Muta una estrategia de forma aleatoria
+    //
+    // Implementa 5 tipos diferentes de mutación para mantener diversidad genética:
+    //
+    // 1. **Reemplazar condición de entrada** (probabilidad: mutation_rate)
+    // 2. **Reemplazar condición de salida** (probabilidad: mutation_rate)
+    // 3. **Cambiar operador lógico** (probabilidad: mutation_rate * 0.5)
+    // 4. **Ajustar parámetros de indicadores** (probabilidad: mutation_rate * 0.3)
+    // 5. **Cambiar comparador** (probabilidad: mutation_rate * 0.2)
+    //
+    // # Argumentos
+    //
+    // * `strategy` - Estrategia a mutar (modificada in-place)
     pub fn mutate(&self, strategy: &mut StrategyAST) {
         let mut rng = rand::thread_rng();
 
@@ -129,9 +216,9 @@ impl GeneticGenerator {
         }
     }
 
-    /// Mutación de parámetros de indicadores existentes
-    /// 
-    /// Ajusta los parámetros dentro de rangos válidos según metadata
+    // Mutación de parámetros de indicadores existentes
+    // 
+    // Ajusta los parámetros dentro de rangos válidos según metadata
     fn mutate_parameters(&self, strategy: &mut StrategyAST, rng: &mut impl Rng) {
         let mut all_conditions: Vec<&mut Condition> = strategy
             .entry_rules
@@ -148,7 +235,7 @@ impl GeneticGenerator {
         self.mutate_indicator_params(&mut all_conditions[idx].indicator, rng);
     }
 
-    /// Muta los parámetros de un indicador usando metadata del registry
+    // Muta los parámetros de un indicador usando metadata del registry
     fn mutate_indicator_params(&self, indicator: &mut IndicatorType, rng: &mut impl Rng) {
         let name = indicator.name();
         
@@ -172,7 +259,7 @@ impl GeneticGenerator {
         }
     }
 
-    /// Mutación de comparador
+    // Mutación de comparador
     fn mutate_comparison(&self, strategy: &mut StrategyAST, rng: &mut impl Rng) {
         let mut all_conditions: Vec<&mut Condition> = strategy
             .entry_rules
@@ -189,7 +276,19 @@ impl GeneticGenerator {
         all_conditions[idx].comparison = self.random_comparison(rng);
     }
 
-    /// Selección por torneo
+    // Selecciona una estrategia mediante torneo (tournament selection)
+    //
+    // Elige aleatoriamente `tournament_size` candidatos de la población y
+    // retorna el que tiene mejor fitness.
+    //
+    // # Argumentos
+    //
+    // * `population` - Población de estrategias
+    // * `fitness_fn` - Función que calcula el fitness de cada estrategia
+    //
+    // # Returns
+    //
+    // Estrategia ganadora del torneo (clonada)
     pub fn tournament_selection<F>(
         &self,
         population: &[StrategyAST],
@@ -214,9 +313,32 @@ impl GeneticGenerator {
         best.unwrap().0.clone()
     }
 
-    /// Evoluciona una población completa
-    /// 
-    /// Retorna la población final ordenada por fitness (mejor primero)
+    // Evoluciona una población de estrategias usando algoritmo genético
+    //
+    // Implementa un loop evolutivo completo que incluye evaluación de fitness,
+    // selección, crossover, mutación y elitismo.
+    //
+    // # Argumentos
+    //
+    // * `initial_population` - Población inicial de estrategias
+    // * `fitness_fn` - Función que evalúa el fitness (mayor es mejor)
+    //
+    // # Returns
+    //
+    // Vector de estrategias ordenado por fitness (mejor primero)
+    //
+    // # Proceso Evolutivo
+    //
+    // Para cada generación:
+    // 1. Evaluar fitness de toda la población
+    // 2. Preservar elite (mejores estrategias)
+    // 3. Generar nueva población mediante selección, crossover y mutación
+    // 4. Reemplazar población anterior
+    // 5. Verificar convergencia
+    //
+    // # Convergencia
+    //
+    // El algoritmo termina antes si no hay mejora por 25 generaciones consecutivas.
     pub fn evolve<F>(
         &self,
         initial_population: Vec<StrategyAST>,
@@ -237,10 +359,10 @@ impl GeneticGenerator {
                 .map(|(idx, strategy)| (idx, fitness_fn(strategy)))
                 .collect();
 
-            // Ordenar por fitness (mayor es mejor)
+            // Ordenar por fitness (descendente)
             fitness_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-            // Tracking de mejora
+            // Actualizar mejor fitness
             let current_best = fitness_scores[0].1;
             if current_best > best_fitness {
                 best_fitness = current_best;
@@ -249,63 +371,78 @@ impl GeneticGenerator {
                 generations_without_improvement += 1;
             }
 
-            // Early stopping si no hay mejora
-            if generations_without_improvement > 10 {
+            // Logging cada 10 generaciones
+            if generation % 10 == 0 {
+                let avg_fitness = fitness_scores.iter().map(|(_, f)| f).sum::<f64>() / fitness_scores.len() as f64;
+                println!(
+                    "Generación {}/{}, Best: {:.4}, Avg: {:.4}",
+                    generation + 1,
+                    self.config.generations,
+                    current_best,
+                    avg_fitness
+                );
+            }
+
+            // Convergencia anticipada (sin mejora por 25 generaciones)
+            if generations_without_improvement >= 25 {
+                println!("Convergencia alcanzada en generación {}", generation + 1);
                 break;
             }
 
             // Crear nueva generación
             let mut new_population = Vec::new();
 
-            // Elitismo: mantener los mejores sin cambios
+            // Elitismo: preservar las mejores estrategias
             for i in 0..self.config.elite_size.min(population.len()) {
                 let idx = fitness_scores[i].0;
                 new_population.push(population[idx].clone());
             }
 
-            // Generar resto por crossover y mutación
+            // Generar resto de la población
             while new_population.len() < self.config.population_size {
+                // Selección de padres
                 let parent1 = self.tournament_selection(&population, &fitness_fn);
                 let parent2 = self.tournament_selection(&population, &fitness_fn);
-                
+
+                // Crossover
                 let mut child = self.crossover(&parent1, &parent2);
+
+                // Mutación
                 self.mutate(&mut child);
-                
+
                 new_population.push(child);
             }
 
+            // Reemplazar población
             population = new_population;
         }
 
-        // Retornar población final ordenada por fitness
-        let mut final_scores: Vec<(StrategyAST, f64)> = population
-            .into_iter()
-            .map(|s| {
-                let fitness = fitness_fn(&s);
-                (s, fitness)
-            })
+        // Ordenar población final por fitness
+        let mut fitness_scores: Vec<(usize, f64)> = population
+            .iter()
+            .enumerate()
+            .map(|(idx, strategy)| (idx, fitness_fn(strategy)))
             .collect();
 
-        final_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        final_scores.into_iter().map(|(s, _)| s).collect()
+        fitness_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Retornar población ordenada
+        fitness_scores
+            .iter()
+            .map(|(idx, _)| population[*idx].clone())
+            .collect()
     }
 
-    // ===== Métodos auxiliares 100% dinámicos =====
+    // Funciones auxiliares privadas
 
-    /// Genera una condición aleatoria usando el registry
     fn random_condition(&self, rng: &mut impl Rng) -> Condition {
-        let indicator = self.random_indicator(rng);
-        let comparison = self.random_comparison(rng);
-        let value = self.random_value(rng);
-
         Condition {
-            indicator,
-            comparison,
-            value,
+            indicator: self.random_indicator(rng),
+            comparison: self.random_comparison(rng),
+            value: self.random_value(rng),
         }
     }
 
-    /// Genera un indicador aleatorio del registry
     fn random_indicator(&self, rng: &mut impl Rng) -> IndicatorType {
         let available = registry::all_names();
         
@@ -379,7 +516,7 @@ mod tests {
         });
 
         let mut pop = generator.generate_population(1);
-        let original = pop[0].clone();
+        let _original = pop[0].clone();
 
         // Mutar múltiples veces
         for _ in 0..10 {
@@ -534,7 +671,6 @@ mod tests {
         let evolved_pop = generator.evolve(initial_pop, fitness_fn);
 
         // Los 3 mejores iniciales deberían estar en la población final
-        // (o mejores versiones con misma complejidad)
         let final_scores: Vec<_> = evolved_pop.iter()
             .map(|s| fitness_fn(s))
             .collect();
