@@ -1,6 +1,6 @@
 ⚡ Backtest Engine - Arquitectura Dual
 🔥 1. Polars Engine (Vectorizado)
-rust// crates/backtest-engine/src/polars_engine/
+// crates/backtest-engine/src/polars_engine/
 ├── vectorized.rs     // Motor principal vectorizado
 ├── parallel.rs       // Ejecución paralela con Rayon
 └── optimizer.rs      // Optimización de queries
@@ -13,7 +13,7 @@ Características:
 ✅ Uso: Backtest masivo, análisis estadístico
 
 🎯 2. Event-Driven Engine (Simulación realista)
-rust// crates/backtest-engine/src/event_driven/
+// crates/backtest-engine/src/event_driven/
 ├── engine.rs         // Motor principal event-driven
 ├── order_book.rs     // Simulación de order book
 └── execution.rs      // Ejecución tick-by-tick
@@ -26,7 +26,7 @@ Características:
 ✅ Uso: Validación final, estrategias complejas
 
 🏗️ ESTRUCTURA COMPLETA
-rust// crates/backtest-engine/src/
+// crates/backtest-engine/src/
 ├── lib.rs
 ├── types.rs                    // BacktestResult, Trade, Config
 ├── metrics/
@@ -80,7 +80,7 @@ Polars Engine primero porque:
 
 💻 IMPLEMENTACIÓN TÉCNICA
 Cargo.toml actualizado:
-toml[dependencies]
+[dependencies]
 darwinx-core = { path = "../core" }
 darwinx-indicators = { path = "../indicators" }
 darwinx-strategy-generator = { path = "../strategy-generator" }
@@ -89,7 +89,7 @@ rayon = "1.10"
 tokio = { version = "1.0", features = ["full"] }
 anyhow = "1.0"
 API pública:
-rust// Dos engines distintos
+// Dos engines distintos
 pub use polars_engine::PolarsBacktestEngine;
 pub use event_driven::EventDrivenEngine;
 

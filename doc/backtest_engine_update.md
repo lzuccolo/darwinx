@@ -14,7 +14,7 @@ Strategy Generator → Compiled Strategy → Backtest Engine → Results
 
 🏗️ Arquitectura del Sistema
 Input: Estrategia Compilada
-rusttrait Strategy {
+trait Strategy {
     fn name(&self) -> &str;
     fn should_enter_long(&self, candles: &[Candle], index: usize) -> bool;
     fn should_exit_long(&self, candles: &[Candle], index: usize) -> bool;
@@ -23,7 +23,7 @@ rusttrait Strategy {
     fn position_size(&self, balance: f64, price: f64) -> f64;
 }
 Output: Resultado de Backtest
-ruststruct BacktestResult {
+struct BacktestResult {
     strategy_name: String,
     metrics: BacktestMetrics,
     trades: Vec<Trade>,
@@ -41,12 +41,12 @@ Características:
 ✅ Uso: Backtest masivo, análisis estadístico
 
 Estructura:
-rustcrates/backtest-engine/src/polars_engine/
+crates/backtest-engine/src/polars_engine/
 ├── vectorized.rs     // Motor principal vectorizado
 ├── parallel.rs       // Ejecución paralela con Rayon
 └── optimizer.rs      // Optimización de queries
 Flujo de Ejecución:
-rustimpl PolarsBacktestEngine {
+impl PolarsBacktestEngine {
     async fn run_backtest(
         &self,
         strategy: &dyn Strategy,
@@ -76,12 +76,12 @@ Características:
 ✅ Uso: Validación final, estrategias complejas
 
 Estructura:
-rustcrates/backtest-engine/src/event_driven/
+crates/backtest-engine/src/event_driven/
 ├── engine.rs         // Motor principal event-driven
 ├── order_book.rs     // Simulación de order book
 └── execution.rs      // Ejecución tick-by-tick
 Flujo de Ejecución:
-rustimpl EventDrivenEngine {
+impl EventDrivenEngine {
     async fn run_backtest(
         &self,
         strategy: &dyn Strategy,
@@ -118,12 +118,12 @@ rustimpl EventDrivenEngine {
 
 📊 Sistema de Métricas
 Estructura Modular:
-rustcrates/backtest-engine/src/metrics/
+crates/backtest-engine/src/metrics/
 ├── returns.rs        // Sharpe, Sortino, Total Return
 ├── risk.rs           // Max DD, Calmar, VaR
 └── statistics.rs     // Win Rate, Profit Factor
 Métricas Calculadas:
-ruststruct BacktestMetrics {
+struct BacktestMetrics {
     // Returns
     total_return: f64,
     annualized_return: f64,
@@ -144,11 +144,11 @@ ruststruct BacktestMetrics {
 
 🚀 Sistema de Batch Processing
 Estructura:
-rustcrates/backtest-engine/src/batch/
+crates/backtest-engine/src/batch/
 ├── scheduler.rs      // Job scheduling y distribución
 └── worker.rs         // Worker pool para paralelización
 Funcionalidad:
-rustimpl BatchScheduler {
+impl BatchScheduler {
     async fn run_batch(
         &self,
         strategies: Vec<Box<dyn Strategy>>,
@@ -172,7 +172,7 @@ rustimpl BatchScheduler {
 
 💻 API Pública Unificada
 Trait Principal:
-rust#[async_trait::async_trait]
+#[async_trait::async_trait]
 pub trait BacktestEngine {
     /// Ejecuta backtest individual
     async fn run_backtest(
@@ -192,7 +192,7 @@ pub trait BacktestEngine {
     ) -> Result<Vec<BacktestResult>>;
 }
 Implementaciones:
-rust// Motor rápido para análisis masivo
+// Motor rápido para análisis masivo
 pub struct PolarsBacktestEngine {
     config: BacktestConfig,
 }
@@ -205,7 +205,7 @@ pub struct EventDrivenEngine {
 
 🔧 Configuración del Sistema
 BacktestConfig:
-ruststruct BacktestConfig {
+struct BacktestConfig {
     initial_balance: f64,     // Balance inicial
     commission_rate: f64,     // Comisión por trade
     slippage_bps: f64,        // Slippage en basis points
