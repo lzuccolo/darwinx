@@ -8,7 +8,6 @@ import sys
 import argparse
 from pathlib import Path
 
-#GITHUB_BASE = "https://github.com/lzuccolo/darwinx/blob/main/crates"
 GITHUB_BASE = "https://raw.githubusercontent.com/lzuccolo/darwinx/refs/heads/main/crates"
 
 def is_file_type(path):
