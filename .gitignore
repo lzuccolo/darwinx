@@ -22,3 +22,4 @@ Cargo.lock
 *.db-wal
 *.sqlite
 *.sqlite3
+*.zip
