@@ -1,0 +1,60 @@
+//! Configuración del Backtest Engine
+
+use serde::{Deserialize, Serialize};
+
+/// Configuración para ejecutar un backtest
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BacktestConfig {
+    /// Balance inicial
+    pub initial_balance: f64,
+    /// Comisión por trade (como porcentaje, ej: 0.001 = 0.1%)
+    pub commission_rate: f64,
+    /// Slippage en basis points (ej: 5 = 0.05%)
+    pub slippage_bps: f64,
+    /// Máximo número de posiciones simultáneas
+    pub max_positions: usize,
+    /// Riesgo por trade como porcentaje del balance (ej: 0.02 = 2%)
+    pub risk_per_trade: f64,
+}
+
+impl Default for BacktestConfig {
+    fn default() -> Self {
+        Self {
+            initial_balance: 10000.0,
+            commission_rate: 0.001, // 0.1%
+            slippage_bps: 5.0,      // 0.05%
+            max_positions: 1,
+            risk_per_trade: 0.02,   // 2%
+        }
+    }
+}
+
+impl BacktestConfig {
+    /// Crea una configuración con valores personalizados
+    pub fn new(
+        initial_balance: f64,
+        commission_rate: f64,
+        slippage_bps: f64,
+        max_positions: usize,
+        risk_per_trade: f64,
+    ) -> Self {
+        Self {
+            initial_balance,
+            commission_rate,
+            slippage_bps,
+            max_positions,
+            risk_per_trade,
+        }
+    }
+
+    /// Calcula la comisión para un trade
+    pub fn calculate_commission(&self, trade_value: f64) -> f64 {
+        trade_value * self.commission_rate
+    }
+
+    /// Calcula el slippage para un trade
+    pub fn calculate_slippage(&self, price: f64) -> f64 {
+        price * (self.slippage_bps / 10000.0)
+    }
+}
+

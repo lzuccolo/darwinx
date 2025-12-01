@@ -2,14 +2,26 @@
 
 use darwinx_core::Candle;
 use polars::prelude::*;
+use std::sync::Arc;
 
 /// Loader para archivos CSV
 pub struct CsvLoader;
 
 impl CsvLoader {
     pub fn load(path: &str) -> anyhow::Result<Vec<Candle>> {
+        // Especificar tipos de datos para evitar inferencia incorrecta
+        let schema = Schema::from_iter([
+            Field::new("timestamp".into(), DataType::Int64),
+            Field::new("open".into(), DataType::Float64),
+            Field::new("high".into(), DataType::Float64),
+            Field::new("low".into(), DataType::Float64),
+            Field::new("close".into(), DataType::Float64),
+            Field::new("volume".into(), DataType::Float64),
+        ]);
+
         let df = CsvReadOptions::default()
             .with_has_header(true)
+            .with_schema(Some(Arc::new(schema)))
             .try_into_reader_with_file_path(Some(path.into()))?
             .finish()?;
 
@@ -22,14 +34,26 @@ impl CsvLoader {
 
         let mut candles = Vec::new();
         for i in 0..df.height() {
-            candles.push(Candle::new(
-                timestamps.get(i).unwrap(),
-                opens.get(i).unwrap(),
-                highs.get(i).unwrap(),
-                lows.get(i).unwrap(),
-                closes.get(i).unwrap(),
-                volumes.get(i).unwrap(),
-            ));
+            let timestamp = timestamps.get(i).ok_or_else(|| {
+                anyhow::anyhow!("Missing timestamp at index {}", i)
+            })?;
+            let open = opens.get(i).ok_or_else(|| {
+                anyhow::anyhow!("Missing open at index {}", i)
+            })?;
+            let high = highs.get(i).ok_or_else(|| {
+                anyhow::anyhow!("Missing high at index {}", i)
+            })?;
+            let low = lows.get(i).ok_or_else(|| {
+                anyhow::anyhow!("Missing low at index {}", i)
+            })?;
+            let close = closes.get(i).ok_or_else(|| {
+                anyhow::anyhow!("Missing close at index {}", i)
+            })?;
+            let volume = volumes.get(i).ok_or_else(|| {
+                anyhow::anyhow!("Missing volume at index {}", i)
+            })?;
+
+            candles.push(Candle::new(timestamp, open, high, low, close, volume));
         }
 
         Ok(candles)

@@ -2,7 +2,7 @@ pub mod loader;
 pub mod multi_timeframe;
 
 // Re-exports for loaders
-pub use loader::{CsvLoader, ParquetLoader};
+pub use loader::{CsvLoader, ParquetLoader, MultiTimeframeLoader};
 
 // Re-exports for multi-timeframe
 pub use multi_timeframe::{

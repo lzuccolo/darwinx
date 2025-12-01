@@ -26,6 +26,7 @@ DarwinX es un ecosistema modular de trading algorítmico en Rust que permite gen
 
 ### 🔧 Desarrollo
 - [Prompts](./development/prompts.md) - Prompts y guías para desarrollo
+- [⭐ Estándares de Código](./development/coding-standards.md) - **Rust 2024 Edition Standards** - Código simple, modular, performante y robusto
 
 ## 🚀 Inicio Rápido
 Ver [README.md](../README.md) en la raíz del proyecto para comenzar.

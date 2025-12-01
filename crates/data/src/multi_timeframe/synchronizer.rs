@@ -48,7 +48,7 @@ impl TimeframeSynchronizer {
     }
 
     /// Checks if timeframes are compatible for synchronization
-    pub fn are_timeframes_compatible(tf1: TimeFrame, tf2: TimeFrame) -> bool {
+    pub fn are_timeframes_compatible(_tf1: TimeFrame, _tf2: TimeFrame) -> bool {
         // All timeframes are compatible for basic sync
         // This could be extended with more sophisticated rules
         true

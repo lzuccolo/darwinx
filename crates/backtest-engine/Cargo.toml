@@ -1,0 +1,47 @@
+[package]
+name = "darwinx-backtest-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+darwinx-core = { workspace = true }
+darwinx-data = { workspace = true }
+
+# Data processing
+polars = { workspace = true }
+
+# Async
+async-trait = "0.1"
+tokio = { workspace = true }
+
+# Parallelization
+rayon = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Math & Statistics
+statrs = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+criterion = { version = "0.5", features = ["html_reports"] }
+
+# [[bench]]
+# name = "backtest_performance"
+# harness = false
+
