@@ -1,0 +1,31 @@
+[package]
+name = "darwinx-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "massive_backtest"
+path = "src/bin/massive_backtest.rs"
+
+[dependencies]
+darwinx-core = { workspace = true }
+darwinx-data = { workspace = true }
+darwinx-generator = { workspace = true }
+darwinx-backtest-engine = { path = "../backtest-engine" }
+
+# CLI
+clap = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+

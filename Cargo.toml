@@ -13,6 +13,7 @@ members = [
     "crates/strategy-generator",
     "crates/backtest-engine",
     "crates/strategy-converter",
+    "crates/cli",
     # "crates/optimizer",
     # "crates/runner-live",
     # "crates/data-manager",
