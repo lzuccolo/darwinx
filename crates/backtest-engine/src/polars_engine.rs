@@ -4,6 +4,8 @@
 //! procesamiento vectorizado y paralelo.
 
 pub mod vectorized;
+pub mod massive;
 
 pub use vectorized::PolarsBacktestEngine;
+pub use massive::PolarsVectorizedBacktestEngine;
 

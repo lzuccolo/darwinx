@@ -9,6 +9,8 @@ license.workspace = true
 [dependencies]
 darwinx-core = { workspace = true }
 darwinx-data = { workspace = true }
+darwinx-generator = { workspace = true }
+darwinx-indicators = { workspace = true }
 
 # Data processing
 polars = { workspace = true }

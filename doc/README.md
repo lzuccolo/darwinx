@@ -21,6 +21,9 @@ DarwinX es un ecosistema modular de trading algorítmico en Rust que permite gen
 
 ### 📖 Guías
 - [Generador de Estrategias](./guides/strategy-generator.md) - Cómo usar el generador
+- [⭐ Cómo Ejecutar el Generador](./guides/how-to-run-generator.md) - **Guía práctica paso a paso**
+- [🔍 Comparación de Versiones del Generador](./guides/generator-versions-comparison.md) - **Diferencias entre strategy-generator/ y files/**
+- [📊 Módulo Data](./guides/data-module.md) - **Guía de uso del módulo Data (loaders y multi-timeframe)**
 - [Indicadores](./guides/indicators.md) - Sistema de indicadores técnicos
 - [Multi-Timeframe](./guides/multi-timeframe.md) - Guía de estrategias multi-timeframe
 

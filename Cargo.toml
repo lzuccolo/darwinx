@@ -12,7 +12,7 @@ members = [
     "crates/strategy-store",
     "crates/strategy-generator",
     "crates/backtest-engine",
-    # "crates/strategy-converter",
+    "crates/strategy-converter",
     # "crates/optimizer",
     # "crates/runner-live",
     # "crates/data-manager",
@@ -163,7 +163,7 @@ darwinx-data = { path = "crates/data" }
 darwinx-store = { path = "crates/strategy-store" }
 darwinx-generator = { path = "crates/strategy-generator" }
 darwinx-backtest = { path = "crates/backtest-engine" }
-# darwinx-converter = { path = "crates/strategy-converter" }
+darwinx-converter = { path = "crates/strategy-converter" }
 # darwinx-runner = { path = "crates/runner-live" }
 # darwinx-optimizer = { path = "crates/optimizer" }
 # darwinx-data-manager = { path = "crates/data-manager" }

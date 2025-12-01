@@ -26,4 +26,5 @@ pub use data_provider::{DataProvider, SingleTimeFrameProvider, MultiTimeFramePro
 pub use config::BacktestConfig;
 pub use polars_engine::PolarsBacktestEngine;
 pub use polars_engine::vectorized::{Strategy, BacktestEngine};
+pub use polars_engine::massive::PolarsVectorizedBacktestEngine;
 pub use event_driven::EventDrivenBacktestEngine;
