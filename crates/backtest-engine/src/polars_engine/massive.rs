@@ -14,7 +14,15 @@ use polars::prelude::*;
 use darwinx_core::Candle;
 use darwinx_generator::StrategyAST;
 use darwinx_generator::ast::nodes::{LogicalOperator, Comparison, ConditionValue};
-use darwinx_indicators::{registry, trend::sma, trend::ema, momentum::rsi};
+use darwinx_indicators::registry;
+use darwinx_indicators::trend::{sma, ema};
+use darwinx_indicators::trend::wma::wma;
+use darwinx_indicators::trend::vwma::vwma;
+use darwinx_indicators::momentum::{rsi, macd};
+use darwinx_indicators::momentum::stochastic::stochastic;
+use darwinx_indicators::momentum::roc::roc;
+use darwinx_indicators::volatility::{atr, bollinger_bands, keltner_channels};
+use darwinx_indicators::volume::{obv, mfi, vwap};
 use crate::error::BacktestError;
 use crate::types::{BacktestResult, BacktestMetrics, Trade};
 use crate::config::BacktestConfig;
@@ -290,7 +298,7 @@ impl PolarsVectorizedBacktestEngine {
         df: &DataFrame,
         indicators: &[darwinx_generator::ast::nodes::IndicatorType],
     ) -> Result<DataFrame, BacktestError> {
-        // Obtener la columna close como Series
+        // Obtener todas las columnas necesarias
         let close_series = df.column("close")
             .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to get close column: {}", e)))?;
         let close_values: Vec<f64> = close_series.f64()
@@ -298,6 +306,25 @@ impl PolarsVectorizedBacktestEngine {
             .into_iter()
             .map(|opt| opt.unwrap_or(0.0))
             .collect();
+        
+        // Obtener high, low, volume si están disponibles (para indicadores que los necesitan)
+        let high_values: Vec<f64> = df.column("high")
+            .ok()
+            .and_then(|s| s.f64().ok())
+            .map(|s| s.into_iter().map(|opt| opt.unwrap_or(0.0)).collect())
+            .unwrap_or_else(|| close_values.clone());
+        
+        let low_values: Vec<f64> = df.column("low")
+            .ok()
+            .and_then(|s| s.f64().ok())
+            .map(|s| s.into_iter().map(|opt| opt.unwrap_or(0.0)).collect())
+            .unwrap_or_else(|| close_values.clone());
+        
+        let volume_values: Vec<f64> = df.column("volume")
+            .ok()
+            .and_then(|s| s.f64().ok())
+            .map(|s| s.into_iter().map(|opt| opt.unwrap_or(0.0)).collect())
+            .unwrap_or_else(|| vec![1000.0; close_values.len()]);
         
         // Crear columnas para cada indicador
         let mut new_columns = Vec::new();
@@ -310,7 +337,13 @@ impl PolarsVectorizedBacktestEngine {
             }
             
             // Calcular indicador usando las funciones existentes
-            let values = self.calculate_indicator_values(&indicator, &close_values)?;
+            let values = self.calculate_indicator_values(
+                indicator,
+                &close_values,
+                &high_values,
+                &low_values,
+                &volume_values,
+            )?;
             let series = Series::new(col_name.as_str().into(), values);
             new_columns.push(series);
             computed.push(col_name);
@@ -345,6 +378,9 @@ impl PolarsVectorizedBacktestEngine {
         &self,
         indicator: &darwinx_generator::ast::nodes::IndicatorType,
         prices: &[f64],
+        highs: &[f64],
+        lows: &[f64],
+        volumes: &[f64],
     ) -> Result<Vec<f64>, BacktestError> {
         let name = indicator.name.as_str();
         let params = &indicator.params;
@@ -358,7 +394,6 @@ impl PolarsVectorizedBacktestEngine {
                 let period = params.get(0)
                     .ok_or_else(|| BacktestError::StrategyError("SMA requires period parameter".to_string()))?;
                 let period_usize = *period as usize;
-                // Calcular SMA para cada posición
                 let mut values = Vec::with_capacity(prices.len());
                 for i in 0..prices.len() {
                     let end = i + 1;
@@ -376,7 +411,6 @@ impl PolarsVectorizedBacktestEngine {
                 let period = params.get(0)
                     .ok_or_else(|| BacktestError::StrategyError("EMA requires period parameter".to_string()))?;
                 let period_usize = *period as usize;
-                // Calcular EMA para cada posición
                 let mut values = Vec::with_capacity(prices.len());
                 for i in 0..prices.len() {
                     let end = i + 1;
@@ -390,11 +424,45 @@ impl PolarsVectorizedBacktestEngine {
                 }
                 Ok(values)
             }
+            "wma" => {
+                let period = params.get(0)
+                    .ok_or_else(|| BacktestError::StrategyError("WMA requires period parameter".to_string()))?;
+                let period_usize = *period as usize;
+                let mut values = Vec::with_capacity(prices.len());
+                for i in 0..prices.len() {
+                    let end = i + 1;
+                    let start = if end > period_usize { end - period_usize } else { 0 };
+                    let slice = &prices[start..end];
+                    if let Some(wma_val) = wma(slice, period_usize) {
+                        values.push(wma_val);
+                    } else {
+                        values.push(f64::NAN);
+                    }
+                }
+                Ok(values)
+            }
+            "vwma" => {
+                let period = params.get(0)
+                    .ok_or_else(|| BacktestError::StrategyError("VWMA requires period parameter".to_string()))?;
+                let period_usize = *period as usize;
+                let mut values = Vec::with_capacity(prices.len());
+                for i in 0..prices.len() {
+                    let end = i + 1;
+                    let start = if end > period_usize { end - period_usize } else { 0 };
+                    let price_slice = &prices[start..end];
+                    let volume_slice = &volumes[start..end];
+                    if let Some(vwma_val) = vwma(price_slice, volume_slice, period_usize) {
+                        values.push(vwma_val);
+                    } else {
+                        values.push(f64::NAN);
+                    }
+                }
+                Ok(values)
+            }
             "rsi" => {
                 let period = params.get(0)
                     .ok_or_else(|| BacktestError::StrategyError("RSI requires period parameter".to_string()))?;
                 let period_usize = *period as usize;
-                // Calcular RSI para cada posición
                 let mut values = Vec::with_capacity(prices.len());
                 for i in 0..prices.len() {
                     let end = i + 1;
@@ -402,6 +470,178 @@ impl PolarsVectorizedBacktestEngine {
                     let slice = &prices[start..end];
                     if let Some(rsi_val) = rsi(slice, period_usize) {
                         values.push(rsi_val);
+                    } else {
+                        values.push(f64::NAN);
+                    }
+                }
+                Ok(values)
+            }
+            "macd" => {
+                let fast = params.get(0)
+                    .ok_or_else(|| BacktestError::StrategyError("MACD requires fast_period parameter".to_string()))?;
+                let slow = params.get(1)
+                    .ok_or_else(|| BacktestError::StrategyError("MACD requires slow_period parameter".to_string()))?;
+                let signal = params.get(2)
+                    .ok_or_else(|| BacktestError::StrategyError("MACD requires signal_period parameter".to_string()))?;
+                let fast_usize = *fast as usize;
+                let slow_usize = *slow as usize;
+                let signal_usize = *signal as usize;
+                let mut values = Vec::with_capacity(prices.len());
+                for i in 0..prices.len() {
+                    let end = i + 1;
+                    let start = if end > slow_usize { end - slow_usize } else { 0 };
+                    let slice = &prices[start..end];
+                    if let Some((macd_line, _, _)) = macd(slice, fast_usize, slow_usize, signal_usize) {
+                        values.push(macd_line);
+                    } else {
+                        values.push(f64::NAN);
+                    }
+                }
+                Ok(values)
+            }
+            "stochastic" => {
+                let period = params.get(0)
+                    .ok_or_else(|| BacktestError::StrategyError("Stochastic requires period parameter".to_string()))?;
+                let period_usize = *period as usize;
+                let mut values = Vec::with_capacity(prices.len());
+                for i in 0..prices.len() {
+                    let end = i + 1;
+                    let start = if end > period_usize { end - period_usize } else { 0 };
+                    let high_slice = &highs[start..end];
+                    let low_slice = &lows[start..end];
+                    let close_slice = &prices[start..end];
+                    if let Some(stoch_val) = stochastic(high_slice, low_slice, close_slice, period_usize) {
+                        values.push(stoch_val);
+                    } else {
+                        values.push(f64::NAN);
+                    }
+                }
+                Ok(values)
+            }
+            "roc" => {
+                let period = params.get(0)
+                    .ok_or_else(|| BacktestError::StrategyError("ROC requires period parameter".to_string()))?;
+                let period_usize = *period as usize;
+                let mut values = Vec::with_capacity(prices.len());
+                for i in 0..prices.len() {
+                    let end = i + 1;
+                    let start = if end > period_usize + 1 { end - period_usize - 1 } else { 0 };
+                    let slice = &prices[start..end];
+                    if let Some(roc_val) = roc(slice, period_usize) {
+                        values.push(roc_val);
+                    } else {
+                        values.push(f64::NAN);
+                    }
+                }
+                Ok(values)
+            }
+            "atr" => {
+                let period = params.get(0)
+                    .ok_or_else(|| BacktestError::StrategyError("ATR requires period parameter".to_string()))?;
+                let period_usize = *period as usize;
+                let mut values = Vec::with_capacity(prices.len());
+                for i in 0..prices.len() {
+                    let end = i + 1;
+                    let start = if end > period_usize + 1 { end - period_usize - 1 } else { 0 };
+                    let high_slice = &highs[start..end];
+                    let low_slice = &lows[start..end];
+                    let close_slice = &prices[start..end];
+                    if let Some(atr_val) = atr(high_slice, low_slice, close_slice, period_usize) {
+                        values.push(atr_val);
+                    } else {
+                        values.push(f64::NAN);
+                    }
+                }
+                Ok(values)
+            }
+            "bollinger_bands" => {
+                let period = params.get(0)
+                    .ok_or_else(|| BacktestError::StrategyError("Bollinger requires period parameter".to_string()))?;
+                let std_dev = params.get(1)
+                    .ok_or_else(|| BacktestError::StrategyError("Bollinger requires std_dev parameter".to_string()))?;
+                let period_usize = *period as usize;
+                let mut values = Vec::with_capacity(prices.len());
+                for i in 0..prices.len() {
+                    let end = i + 1;
+                    let start = if end > period_usize { end - period_usize } else { 0 };
+                    let slice = &prices[start..end];
+                    // Bollinger retorna (lower, middle, upper), usamos middle
+                    if let Some((_, middle, _)) = bollinger_bands(slice, period_usize, *std_dev) {
+                        values.push(middle);
+                    } else {
+                        values.push(f64::NAN);
+                    }
+                }
+                Ok(values)
+            }
+            "keltner_channels" => {
+                let period = params.get(0)
+                    .ok_or_else(|| BacktestError::StrategyError("Keltner requires period parameter".to_string()))?;
+                let multiplier = params.get(1)
+                    .ok_or_else(|| BacktestError::StrategyError("Keltner requires multiplier parameter".to_string()))?;
+                let period_usize = *period as usize;
+                let mut values = Vec::with_capacity(prices.len());
+                for i in 0..prices.len() {
+                    let end = i + 1;
+                    let start = if end > period_usize + 1 { end - period_usize - 1 } else { 0 };
+                    let high_slice = &highs[start..end];
+                    let low_slice = &lows[start..end];
+                    let close_slice = &prices[start..end];
+                    // Keltner retorna (lower, middle, upper), usamos middle
+                    if let Some((_, middle, _)) = keltner_channels(high_slice, low_slice, close_slice, period_usize, *multiplier) {
+                        values.push(middle);
+                    } else {
+                        values.push(f64::NAN);
+                    }
+                }
+                Ok(values)
+            }
+            "obv" => {
+                // OBV retorna Vec<f64>, usamos el último valor
+                let mut values = Vec::with_capacity(prices.len());
+                for i in 0..prices.len() {
+                    let end = i + 1;
+                    let price_slice = &prices[0..end];
+                    let volume_slice = &volumes[0..end];
+                    if let Some(obv_values) = obv(price_slice, volume_slice) {
+                        values.push(*obv_values.last().unwrap_or(&f64::NAN));
+                    } else {
+                        values.push(f64::NAN);
+                    }
+                }
+                Ok(values)
+            }
+            "mfi" => {
+                let period = params.get(0)
+                    .ok_or_else(|| BacktestError::StrategyError("MFI requires period parameter".to_string()))?;
+                let period_usize = *period as usize;
+                let mut values = Vec::with_capacity(prices.len());
+                for i in 0..prices.len() {
+                    let end = i + 1;
+                    let start = if end > period_usize + 1 { end - period_usize - 1 } else { 0 };
+                    let high_slice = &highs[start..end];
+                    let low_slice = &lows[start..end];
+                    let close_slice = &prices[start..end];
+                    let volume_slice = &volumes[start..end];
+                    if let Some(mfi_val) = mfi(high_slice, low_slice, close_slice, volume_slice, period_usize) {
+                        values.push(mfi_val);
+                    } else {
+                        values.push(f64::NAN);
+                    }
+                }
+                Ok(values)
+            }
+            "vwap" => {
+                // VWAP se calcula desde el inicio hasta cada punto
+                let mut values = Vec::with_capacity(prices.len());
+                for i in 0..prices.len() {
+                    let end = i + 1;
+                    let high_slice = &highs[0..end];
+                    let low_slice = &lows[0..end];
+                    let close_slice = &prices[0..end];
+                    let volume_slice = &volumes[0..end];
+                    if let Some(vwap_val) = vwap(high_slice, low_slice, close_slice, volume_slice) {
+                        values.push(vwap_val);
                     } else {
                         values.push(f64::NAN);
                     }

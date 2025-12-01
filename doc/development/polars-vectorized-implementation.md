@@ -20,7 +20,11 @@
    - ✅ `precompute_indicators()` - Pre-calcula indicadores en DataFrame
    - ✅ `calculate_indicator_values()` - Calcula valores usando funciones de darwinx-indicators
    - ✅ `indicator_to_polars_expr()` - Referencia columnas pre-calculadas
-   - ✅ SMA, EMA, RSI implementados usando funciones reales
+   - ✅ **Todos los indicadores implementados (14/14)**:
+     - **Trend**: SMA, EMA, WMA, VWMA
+     - **Momentum**: RSI, MACD, Stochastic, ROC
+     - **Volatility**: ATR, Bollinger Bands, Keltner Channels
+     - **Volume**: OBV, MFI, VWAP
 
 4. **Simulación de Trading**
    - ✅ `calculate_trades_from_signals()` - Implementación completa
@@ -32,21 +36,41 @@
    - ✅ `calculate_metrics_from_trades()` - Métricas completas
    - ✅ Returns, Sharpe, Sortino, Drawdown, etc.
 
-## ✅ Indicadores Implementados
+## ✅ Indicadores Implementados (14/14)
 
-### Indicadores Reales
+### Todos los Indicadores del Registry
 
-Los indicadores ahora usan las funciones reales de `darwinx-indicators`:
-- ✅ `sma` → Calcula Simple Moving Average usando `darwinx_indicators::trend::sma`
-- ✅ `ema` → Calcula Exponential Moving Average usando `darwinx_indicators::trend::ema`
-- ✅ `rsi` → Calcula Relative Strength Index usando `darwinx_indicators::momentum::rsi`
-- ⚠️ Otros → Usan `close` como fallback temporal
+Todos los indicadores ahora usan las funciones reales de `darwinx-indicators`:
+
+#### Trend (4)
+- ✅ `sma` → Simple Moving Average (`darwinx_indicators::trend::sma`)
+- ✅ `ema` → Exponential Moving Average (`darwinx_indicators::trend::ema`)
+- ✅ `wma` → Weighted Moving Average (`darwinx_indicators::trend::wma`)
+- ✅ `vwma` → Volume Weighted Moving Average (`darwinx_indicators::trend::vwma`)
+
+#### Momentum (4)
+- ✅ `rsi` → Relative Strength Index (`darwinx_indicators::momentum::rsi`)
+- ✅ `macd` → Moving Average Convergence Divergence (`darwinx_indicators::momentum::macd`) - usa macd_line
+- ✅ `stochastic` → Stochastic Oscillator (`darwinx_indicators::momentum::stochastic`)
+- ✅ `roc` → Rate of Change (`darwinx_indicators::momentum::roc`)
+
+#### Volatility (3)
+- ✅ `atr` → Average True Range (`darwinx_indicators::volatility::atr`)
+- ✅ `bollinger_bands` → Bollinger Bands (`darwinx_indicators::volatility::bollinger_bands`) - usa middle
+- ✅ `keltner_channels` → Keltner Channels (`darwinx_indicators::volatility::keltner_channels`) - usa middle
+
+#### Volume (3)
+- ✅ `obv` → On-Balance Volume (`darwinx_indicators::volume::obv`)
+- ✅ `mfi` → Money Flow Index (`darwinx_indicators::volume::mfi`)
+- ✅ `vwap` → Volume Weighted Average Price (`darwinx_indicators::volume::vwap`)
 
 **Implementación**: 
 1. Pre-calcula todos los indicadores necesarios en el DataFrame
 2. Usa las funciones existentes de `darwinx-indicators` para calcular valores
 3. Maneja valores NaN cuando no hay suficientes datos
-4. Referencia las columnas pre-calculadas en las expresiones
+4. Soporta indicadores que requieren high, low, volume (con fallbacks)
+5. Referencia las columnas pre-calculadas en las expresiones
+6. Los indicadores multi-valor (MACD, Bollinger, Keltner) usan el valor principal
 
 ### CrossesAbove/CrossesBelow
 

@@ -146,25 +146,33 @@ StrategyAST {
 }
 ```
 
-## ⚠️ Estado de Implementación en Backtest Polars
+## ✅ Estado de Implementación en Backtest Polars
 
-### ✅ Implementados (3)
-- **SMA**: Simple Moving Average
-- **EMA**: Exponential Moving Average  
-- **RSI**: Relative Strength Index
+### ✅ Todos los Indicadores Implementados (14/14)
 
-### ⚠️ Pendientes (11)
-- **WMA**: Weighted Moving Average
-- **VWMA**: Volume Weighted Moving Average
-- **MACD**: Moving Average Convergence Divergence
-- **Stochastic**: Stochastic Oscillator
-- **ROC**: Rate of Change
-- **ATR**: Average True Range
-- **Bollinger Bands**: Bollinger Bands
-- **Keltner Channels**: Keltner Channels
-- **OBV**: On-Balance Volume
-- **MFI**: Money Flow Index
-- **VWAP**: Volume Weighted Average Price
+#### Trend (4/4)
+- **SMA**: Simple Moving Average ✅
+- **EMA**: Exponential Moving Average ✅
+- **WMA**: Weighted Moving Average ✅
+- **VWMA**: Volume Weighted Moving Average ✅
+
+#### Momentum (4/4)
+- **RSI**: Relative Strength Index ✅
+- **MACD**: Moving Average Convergence Divergence ✅ (usa macd_line)
+- **Stochastic**: Stochastic Oscillator ✅
+- **ROC**: Rate of Change ✅
+
+#### Volatility (3/3)
+- **ATR**: Average True Range ✅
+- **Bollinger Bands**: Bollinger Bands ✅ (usa middle band)
+- **Keltner Channels**: Keltner Channels ✅ (usa middle channel)
+
+#### Volume (3/3)
+- **OBV**: On-Balance Volume ✅
+- **MFI**: Money Flow Index ✅
+- **VWAP**: Volume Weighted Average Price ✅
+
+**Nota**: Los indicadores que retornan múltiples valores (MACD, Bollinger, Keltner) usan el valor principal (macd_line, middle band/channel) para las comparaciones en las estrategias.
 
 ## 🚀 Extensibilidad
 
