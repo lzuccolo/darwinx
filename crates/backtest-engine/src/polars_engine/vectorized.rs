@@ -392,6 +392,12 @@ impl PolarsBacktestEngine {
             0.0
         };
 
+        // Contar trades por razón de salida
+        let stop_loss_exits = trades.iter().filter(|t| t.exit_reason == "StopLoss").count();
+        let take_profit_exits = trades.iter().filter(|t| t.exit_reason == "TakeProfit").count();
+        let signal_exits = trades.iter().filter(|t| t.exit_reason == "Signal").count();
+        let end_of_data_exits = trades.iter().filter(|t| t.exit_reason == "End of data" || t.exit_reason == "EndOfData").count();
+
         Ok(BacktestMetrics {
             total_return,
             annualized_return,
@@ -422,6 +428,10 @@ impl PolarsBacktestEngine {
             max_consecutive_losses,
             trades_per_month,
             trades_per_year,
+            stop_loss_exits,
+            take_profit_exits,
+            signal_exits,
+            end_of_data_exits,
         })
     }
 }

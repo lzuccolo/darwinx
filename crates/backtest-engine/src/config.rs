@@ -15,6 +15,10 @@ pub struct BacktestConfig {
     pub max_positions: usize,
     /// Riesgo por trade como porcentaje del balance (ej: 0.02 = 2%)
     pub risk_per_trade: f64,
+    /// Stop loss como porcentaje del precio de entrada (ej: 0.02 = 2%, None = deshabilitado)
+    pub stop_loss_percent: Option<f64>,
+    /// Take profit como porcentaje del precio de entrada (ej: 0.05 = 5%, None = deshabilitado)
+    pub take_profit_percent: Option<f64>,
 }
 
 impl Default for BacktestConfig {
@@ -25,6 +29,8 @@ impl Default for BacktestConfig {
             slippage_bps: 5.0,      // 0.05%
             max_positions: 1,
             risk_per_trade: 0.02,   // 2%
+            stop_loss_percent: None, // Deshabilitado por defecto
+            take_profit_percent: None, // Deshabilitado por defecto
         }
     }
 }
@@ -44,6 +50,29 @@ impl BacktestConfig {
             slippage_bps,
             max_positions,
             risk_per_trade,
+            stop_loss_percent: None,
+            take_profit_percent: None,
+        }
+    }
+
+    /// Crea una configuración con stop loss y take profit
+    pub fn with_risk_management(
+        initial_balance: f64,
+        commission_rate: f64,
+        slippage_bps: f64,
+        max_positions: usize,
+        risk_per_trade: f64,
+        stop_loss_percent: Option<f64>,
+        take_profit_percent: Option<f64>,
+    ) -> Self {
+        Self {
+            initial_balance,
+            commission_rate,
+            slippage_bps,
+            max_positions,
+            risk_per_trade,
+            stop_loss_percent,
+            take_profit_percent,
         }
     }
 

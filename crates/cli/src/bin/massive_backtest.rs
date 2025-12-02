@@ -20,7 +20,6 @@ use darwinx_backtest_engine::{
     BacktestResult,
 };
 use serde_json;
-use std::collections::HashMap;
 use std::fs::{File, create_dir_all};
 use std::io::Write;
 use std::path::Path;
@@ -67,6 +66,14 @@ struct Config {
     /// Riesgo por trade como porcentaje del balance (ej: 0.02 = 2%)
     #[arg(long, default_value_t = 0.02)]
     risk_per_trade: f64,
+
+    /// Stop loss como porcentaje del precio de entrada (ej: 0.02 = 2%, 0 = deshabilitado)
+    #[arg(long)]
+    stop_loss: Option<f64>,
+
+    /// Take profit como porcentaje del precio de entrada (ej: 0.05 = 5%, 0 = deshabilitado)
+    #[arg(long)]
+    take_profit: Option<f64>,
 
     /// Filtros de calidad
     /// Mínimo número de trades requeridos
@@ -145,6 +152,12 @@ async fn main() -> anyhow::Result<()> {
         println!("   Comisión:            {:.4}%", config.commission_rate * 100.0);
         println!("   Slippage:            {:.2} bps", config.slippage_bps);
         println!("   Riesgo por trade:    {:.2}%", config.risk_per_trade * 100.0);
+        if let Some(sl) = config.stop_loss {
+            println!("   Stop Loss:           {:.2}%", sl * 100.0);
+        }
+        if let Some(tp) = config.take_profit {
+            println!("   Take Profit:         {:.2}%", tp * 100.0);
+        }
         println!();
     }
 
@@ -267,13 +280,15 @@ async fn main() -> anyhow::Result<()> {
     if config.verbose {
         println!("⚙️  FASE 3: Configurando backtest...");
     }
-    let backtest_config = BacktestConfig {
-        initial_balance: config.initial_balance,
-        commission_rate: config.commission_rate,
-        slippage_bps: config.slippage_bps,
-        max_positions: 1,
-        risk_per_trade: config.risk_per_trade,
-    };
+    let backtest_config = BacktestConfig::with_risk_management(
+        config.initial_balance,
+        config.commission_rate,
+        config.slippage_bps,
+        1, // max_positions
+        config.risk_per_trade,
+        config.stop_loss,
+        config.take_profit,
+    );
     if config.verbose {
         println!("   ✅ Configuración lista\n");
     }
@@ -419,6 +434,14 @@ async fn main() -> anyhow::Result<()> {
             println!("      Max Consecutive Losses: {}", m.max_consecutive_losses);
             println!("      Trades/Month:     {:.1}", m.trades_per_month);
             println!("      Trades/Year:      {:.1}", m.trades_per_year);
+            if m.stop_loss_exits > 0 || m.take_profit_exits > 0 {
+                println!("      Exits por Stop Loss:  {}", m.stop_loss_exits);
+                println!("      Exits por Take Profit: {}", m.take_profit_exits);
+            }
+            println!("      Exits por Señal:    {}", m.signal_exits);
+            if m.end_of_data_exits > 0 {
+                println!("      Exits fin de datos:  {}", m.end_of_data_exits);
+            }
         } else {
             println!("{}. {} | Return: {:.2}% | Sharpe: {:.3} | Trades: {} | Win Rate: {:.2}% | DD: {:.2}%",
                 i + 1, result.strategy_name, 

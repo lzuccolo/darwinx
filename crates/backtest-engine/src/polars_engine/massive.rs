@@ -694,6 +694,10 @@ impl PolarsVectorizedBacktestEngine {
             .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to get exit_signal: {}", e)))?;
         let close_col = df.column("close")
             .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to get close: {}", e)))?;
+        let high_col = df.column("high")
+            .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to get high: {}", e)))?;
+        let low_col = df.column("low")
+            .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to get low: {}", e)))?;
         let timestamp_col = df.column("timestamp")
             .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to get timestamp: {}", e)))?;
 
@@ -703,6 +707,10 @@ impl PolarsVectorizedBacktestEngine {
             .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to cast exit_signal: {}", e)))?;
         let closes = close_col.f64()
             .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to cast close: {}", e)))?;
+        let highs = high_col.f64()
+            .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to cast high: {}", e)))?;
+        let lows = low_col.f64()
+            .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to cast low: {}", e)))?;
         let timestamps = timestamp_col.i64()
             .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to cast timestamp: {}", e)))?;
 
@@ -717,6 +725,8 @@ impl PolarsVectorizedBacktestEngine {
             let entry_signal = entry_signals.get(i).unwrap_or(false);
             let exit_signal = exit_signals.get(i).unwrap_or(false);
             let close = closes.get(i).ok_or_else(|| BacktestError::DataError(anyhow::anyhow!("Missing close at index {}", i)))?;
+            let high = highs.get(i).ok_or_else(|| BacktestError::DataError(anyhow::anyhow!("Missing high at index {}", i)))?;
+            let low = lows.get(i).ok_or_else(|| BacktestError::DataError(anyhow::anyhow!("Missing low at index {}", i)))?;
             let timestamp = timestamps.get(i).ok_or_else(|| BacktestError::DataError(anyhow::anyhow!("Missing timestamp at index {}", i)))?;
 
             if !in_position && entry_signal {
@@ -731,30 +741,70 @@ impl PolarsVectorizedBacktestEngine {
                     balance -= commission;
                     in_position = true;
                 }
-            } else if in_position && exit_signal {
-                // Salir de posición
-                let slippage = config.calculate_slippage(close);
-                let exit_price = close - slippage;
-                let size = (balance * config.risk_per_trade) / entry_price;
-                let trade_value = exit_price * size;
-                let commission = config.calculate_commission(trade_value);
-                let pnl = (exit_price - entry_price) * size - commission;
+            } else if in_position {
+                // Verificar stop loss y take profit primero (tienen prioridad)
+                let mut should_exit = false;
+                let mut exit_reason = String::new();
+                let mut exit_price = close;
 
-                trades.push(Trade {
-                    entry_timestamp,
-                    exit_timestamp: timestamp,
-                    entry_price,
-                    exit_price,
-                    size,
-                    is_long: true,
-                    pnl,
-                    commission,
-                    slippage: slippage * size,
-                    exit_reason: "Signal".to_string(),
-                });
+                // Verificar Take Profit
+                if let Some(tp_percent) = config.take_profit_percent {
+                    let tp_price = entry_price * (1.0 + tp_percent);
+                    if high >= tp_price {
+                        exit_price = tp_price;
+                        should_exit = true;
+                        exit_reason = "TakeProfit".to_string();
+                    }
+                }
 
-                balance += pnl;
-                in_position = false;
+                // Verificar Stop Loss (solo si no se alcanzó TP)
+                if !should_exit {
+                    if let Some(sl_percent) = config.stop_loss_percent {
+                        let sl_price = entry_price * (1.0 - sl_percent);
+                        if low <= sl_price {
+                            exit_price = sl_price;
+                            should_exit = true;
+                            exit_reason = "StopLoss".to_string();
+                        }
+                    }
+                }
+
+                // Si no se alcanzó SL/TP, verificar señal de salida
+                if !should_exit && exit_signal {
+                    should_exit = true;
+                    exit_reason = "Signal".to_string();
+                    let slippage = config.calculate_slippage(close);
+                    exit_price = close - slippage;
+                }
+
+                // Cerrar posición si es necesario
+                if should_exit {
+                    let size = (balance * config.risk_per_trade) / entry_price;
+                    let trade_value = exit_price * size;
+                    let commission = config.calculate_commission(trade_value);
+                    let pnl = (exit_price - entry_price) * size - commission;
+                    let slippage = if exit_reason == "Signal" {
+                        config.calculate_slippage(close) * size
+                    } else {
+                        0.0 // SL/TP se ejecutan al precio exacto (sin slippage adicional)
+                    };
+
+                    trades.push(Trade {
+                        entry_timestamp,
+                        exit_timestamp: timestamp,
+                        entry_price,
+                        exit_price,
+                        size,
+                        is_long: true,
+                        pnl,
+                        commission,
+                        slippage,
+                        exit_reason,
+                    });
+
+                    balance += pnl;
+                    in_position = false;
+                }
             }
         }
 
@@ -878,6 +928,12 @@ impl PolarsVectorizedBacktestEngine {
             0.0
         };
 
+        // Contar trades por razón de salida
+        let stop_loss_exits = trades.iter().filter(|t| t.exit_reason == "StopLoss").count();
+        let take_profit_exits = trades.iter().filter(|t| t.exit_reason == "TakeProfit").count();
+        let signal_exits = trades.iter().filter(|t| t.exit_reason == "Signal").count();
+        let end_of_data_exits = trades.iter().filter(|t| t.exit_reason == "End of data").count();
+
         Ok(BacktestMetrics {
             total_return,
             annualized_return,
@@ -908,6 +964,10 @@ impl PolarsVectorizedBacktestEngine {
             max_consecutive_losses,
             trades_per_month,
             trades_per_year,
+            stop_loss_exits,
+            take_profit_exits,
+            signal_exits,
+            end_of_data_exits,
         })
     }
 }

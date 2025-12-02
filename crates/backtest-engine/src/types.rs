@@ -77,6 +77,16 @@ pub struct BacktestMetrics {
     pub trades_per_month: f64,
     /// Promedio de trades por año
     pub trades_per_year: f64,
+
+    // Exit reasons (nuevos)
+    /// Número de trades cerrados por Stop Loss
+    pub stop_loss_exits: usize,
+    /// Número de trades cerrados por Take Profit
+    pub take_profit_exits: usize,
+    /// Número de trades cerrados por señal de indicador
+    pub signal_exits: usize,
+    /// Número de trades cerrados al final de datos
+    pub end_of_data_exits: usize,
 }
 
 impl Default for BacktestMetrics {
@@ -111,6 +121,10 @@ impl Default for BacktestMetrics {
             max_consecutive_losses: 0,
             trades_per_month: 0.0,
             trades_per_year: 0.0,
+            stop_loss_exits: 0,
+            take_profit_exits: 0,
+            signal_exits: 0,
+            end_of_data_exits: 0,
         }
     }
 }

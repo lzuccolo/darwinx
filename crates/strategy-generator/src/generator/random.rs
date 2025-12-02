@@ -3,6 +3,7 @@
 use crate::ast::nodes::*;
 use darwinx_core::TimeFrame;
 use darwinx_indicators::registry;
+use darwinx_indicators::metadata::ParamType;
 use rand::prelude::*;
 
 pub struct RandomGenerator {
@@ -103,10 +104,10 @@ impl RandomGenerator {
         let meta = registry::get(selected_name)
             .expect("Indicator should be registered");
         
-        // Generar parámetros aleatorios basados en metadata
+        // Generar parámetros aleatorios basados en metadata (discretizados)
         let params: Vec<f64> = meta.parameters
             .iter()
-            .map(|param_def| rng.gen_range(param_def.min..=param_def.max))
+            .map(|param_def| self.discretize_parameter(param_def, rng))
             .collect();
         
         // Crear indicador dinámico
@@ -128,6 +129,66 @@ impl RandomGenerator {
             0 => ConditionValue::Number(rng.gen_range(20.0..80.0)),
             1 => ConditionValue::Price,
             _ => ConditionValue::Indicator(self.random_indicator(rng)),
+        }
+    }
+
+    /// Discretiza un parámetro según su tipo para evitar combinaciones infinitas
+    fn discretize_parameter(&self, param_def: &darwinx_indicators::metadata::ParameterDef, rng: &mut impl Rng) -> f64 {
+        match param_def.param_type {
+            ParamType::Period => {
+                // Para períodos: solo enteros (paso 1)
+                // Ejemplo: RSI period 2.0-100.0 → solo genera 2, 3, 4, ..., 100
+                let min = param_def.min.max(1.0) as usize;
+                let max = param_def.max as usize;
+                if min > max {
+                    param_def.default
+                } else {
+                    rng.gen_range(min..=max) as f64
+                }
+            }
+            ParamType::Multiplier => {
+                // Para multiplicadores: paso de 0.1
+                // Ejemplo: Bollinger std_dev 1.0-5.0 → genera 1.0, 1.1, 1.2, ..., 5.0
+                let step = 0.1;
+                let steps = ((param_def.max - param_def.min) / step).floor() as usize;
+                let step_index = rng.gen_range(0..=steps);
+                let value = param_def.min + (step_index as f64 * step);
+                // Redondear a 1 decimal para evitar errores de punto flotante
+                (value * 10.0).round() / 10.0
+            }
+            ParamType::Percentage => {
+                // Para porcentajes: paso de 0.01 (1%)
+                // Ejemplo: 0.0-1.0 → genera 0.00, 0.01, 0.02, ..., 1.00
+                let step = 0.01;
+                let steps = ((param_def.max - param_def.min) / step).floor() as usize;
+                let step_index = rng.gen_range(0..=steps);
+                let value = param_def.min + (step_index as f64 * step);
+                // Redondear a 2 decimales
+                (value * 100.0).round() / 100.0
+            }
+            ParamType::Value => {
+                // Para valores arbitrarios: discretizar a paso de 0.1 por defecto
+                // Si el rango es muy pequeño (< 1.0), usar paso más fino
+                let range = param_def.max - param_def.min;
+                let step = if range < 1.0 {
+                    0.01  // Paso fino para rangos pequeños
+                } else if range < 10.0 {
+                    0.1   // Paso medio
+                } else {
+                    1.0   // Paso grueso para rangos grandes
+                };
+                let steps = (range / step).floor() as usize;
+                let step_index = rng.gen_range(0..=steps);
+                let value = param_def.min + (step_index as f64 * step);
+                // Redondear según el paso
+                if step >= 1.0 {
+                    value.round()
+                } else if step >= 0.1 {
+                    (value * 10.0).round() / 10.0
+                } else {
+                    (value * 100.0).round() / 100.0
+                }
+            }
         }
     }
 }
@@ -187,5 +248,38 @@ mod tests {
         
         // Debería haber variedad de indicadores
         assert!(strategies.len() > 0);
+    }
+
+    #[test]
+    fn test_parameter_discretization() {
+        use darwinx_indicators::metadata::{ParameterDef, ParamType};
+        let generator = RandomGenerator::new();
+        let mut rng = rand::thread_rng();
+
+        // Test Period: debe generar solo enteros
+        let period_def = ParameterDef::period("period", 2.0, 100.0, 14.0);
+        for _ in 0..100 {
+            let value = generator.discretize_parameter(&period_def, &mut rng);
+            assert_eq!(value, value.floor(), "Period should be integer");
+            assert!(value >= 2.0 && value <= 100.0, "Period should be in range");
+        }
+
+        // Test Multiplier: debe generar valores con 1 decimal
+        let mult_def = ParameterDef::multiplier("mult", 1.0, 5.0, 2.0);
+        for _ in 0..100 {
+            let value = generator.discretize_parameter(&mult_def, &mut rng);
+            let rounded = (value * 10.0).round() / 10.0;
+            assert_eq!(value, rounded, "Multiplier should have 1 decimal");
+            assert!(value >= 1.0 && value <= 5.0, "Multiplier should be in range");
+        }
+
+        // Test Percentage: debe generar valores con 2 decimales
+        let pct_def = ParameterDef::percentage("pct", 0.0, 1.0, 0.5);
+        for _ in 0..100 {
+            let value = generator.discretize_parameter(&pct_def, &mut rng);
+            let rounded = (value * 100.0).round() / 100.0;
+            assert_eq!(value, rounded, "Percentage should have 2 decimals");
+            assert!(value >= 0.0 && value <= 1.0, "Percentage should be in range");
+        }
     }
 }
