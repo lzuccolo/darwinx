@@ -367,8 +367,30 @@ impl PolarsBacktestEngine {
         let largest_loss = calculate_largest_loss(trades);
         let expectancy = calculate_expectancy(trades);
         
-        let total_profit: f64 = trades.iter().filter(|t| t.pnl > 0.0).map(|t| t.pnl).sum();
+        let total_profit = calculate_total_profit(trades);
+        let total_loss = calculate_total_loss(trades);
         let recovery_factor = calculate_recovery_factor(total_profit, max_drawdown * initial_balance);
+
+        // Calcular duraciones de trades
+        let average_trade_duration_ms = calculate_average_trade_duration(trades);
+        let average_winning_trade_duration_ms = calculate_average_winning_trade_duration(trades);
+        let average_losing_trade_duration_ms = calculate_average_losing_trade_duration(trades);
+
+        // Calcular rachas
+        let max_consecutive_wins = calculate_max_consecutive_wins(trades);
+        let max_consecutive_losses = calculate_max_consecutive_losses(trades);
+
+        // Calcular frecuencia de trading
+        let trades_per_month = if days > 0.0 {
+            (total_trades as f64 / days) * 30.0
+        } else {
+            0.0
+        };
+        let trades_per_year = if days > 0.0 {
+            (total_trades as f64 / days) * 365.0
+        } else {
+            0.0
+        };
 
         Ok(BacktestMetrics {
             total_return,
@@ -390,6 +412,16 @@ impl PolarsBacktestEngine {
             largest_loss,
             expectancy,
             recovery_factor,
+            average_trade_duration_ms,
+            average_winning_trade_duration_ms,
+            average_losing_trade_duration_ms,
+            max_drawdown_percent: max_drawdown, // Ya está como fracción (0.0-1.0)
+            total_profit,
+            total_loss,
+            max_consecutive_wins,
+            max_consecutive_losses,
+            trades_per_month,
+            trades_per_year,
         })
     }
 }

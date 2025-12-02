@@ -70,6 +70,40 @@
 **Prioridad**: 🔥 MEDIA  
 **Estimación**: 1 semana
 
+### Database Support
+- [ ] Crear crate `crates/database/` o módulo en core
+- [ ] Definir traits Repository para cada entidad (StrategyRepository, BacktestRepository, etc.)
+- [ ] Implementar modelos de datos (Strategy, BacktestResult, Metrics, etc.)
+- [ ] Definir schema de base de datos (estrategias, backtests, resultados, métricas)
+- [ ] Implementar SQLiteRepository (usando `rusqlite` o `sqlx`)
+  - [ ] StrategyRepository para SQLite
+  - [ ] BacktestRepository para SQLite
+  - [ ] MetricsRepository para SQLite
+- [ ] Sistema de migraciones para SQLite (usar `sqlx migrate` o similar)
+- [ ] Connection pooling para SQLite
+- [ ] Factory/Builder pattern para crear repositorios según configuración
+- [ ] Tests de integración con SQLite
+- [ ] Documentación de schema y uso
+
+**Prioridad**: 🔥 ALTA  
+**Estimación**: 1-2 semanas  
+**Nota**: Empezar con SQLite para desarrollo y testing, arquitectura preparada para PostgreSQL
+
+### PostgreSQL Support (Futuro)
+- [ ] Implementar PostgreSQLRepository (usando `sqlx` o `tokio-postgres`)
+  - [ ] StrategyRepository para PostgreSQL
+  - [ ] BacktestRepository para PostgreSQL
+  - [ ] MetricsRepository para PostgreSQL
+- [ ] Migrar schema de SQLite a PostgreSQL
+- [ ] Actualizar connection pooling para PostgreSQL
+- [ ] Tests de integración con PostgreSQL
+- [ ] Scripts de migración de datos (SQLite → PostgreSQL)
+- [ ] Documentación de deployment y configuración
+
+**Prioridad**: 🟡 MEDIA  
+**Estimación**: 1 semana  
+**Depende**: Database Support (SQLite con Repository pattern)
+
 ## 💻 MEDIA PRIORIDAD (Semana 5-6)
 
 ### CLI Client

@@ -47,6 +47,36 @@ pub struct BacktestMetrics {
     // Additional
     pub expectancy: f64,
     pub recovery_factor: f64,
+
+    // Trade Duration
+    /// Duración promedio de todos los trades (en milisegundos)
+    pub average_trade_duration_ms: f64,
+    /// Duración promedio de trades ganadores (en milisegundos)
+    pub average_winning_trade_duration_ms: f64,
+    /// Duración promedio de trades perdedores (en milisegundos)
+    pub average_losing_trade_duration_ms: f64,
+
+    // Drawdown (mejoras)
+    /// Máximo drawdown como porcentaje (0.0 - 1.0)
+    pub max_drawdown_percent: f64,
+
+    // Profit/Loss totals
+    /// Suma total de todos los trades ganadores
+    pub total_profit: f64,
+    /// Suma total de todos los trades perdedores (valor absoluto)
+    pub total_loss: f64,
+
+    // Streaks
+    /// Racha máxima de trades ganadores consecutivos
+    pub max_consecutive_wins: usize,
+    /// Racha máxima de trades perdedores consecutivos
+    pub max_consecutive_losses: usize,
+
+    // Trading frequency
+    /// Promedio de trades por mes
+    pub trades_per_month: f64,
+    /// Promedio de trades por año
+    pub trades_per_year: f64,
 }
 
 impl Default for BacktestMetrics {
@@ -71,6 +101,16 @@ impl Default for BacktestMetrics {
             largest_loss: 0.0,
             expectancy: 0.0,
             recovery_factor: 0.0,
+            average_trade_duration_ms: 0.0,
+            average_winning_trade_duration_ms: 0.0,
+            average_losing_trade_duration_ms: 0.0,
+            max_drawdown_percent: 0.0,
+            total_profit: 0.0,
+            total_loss: 0.0,
+            max_consecutive_wins: 0,
+            max_consecutive_losses: 0,
+            trades_per_month: 0.0,
+            trades_per_year: 0.0,
         }
     }
 }

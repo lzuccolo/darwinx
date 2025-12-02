@@ -81,3 +81,80 @@ pub fn calculate_recovery_factor(total_profit: f64, max_drawdown: f64) -> f64 {
     total_profit / max_drawdown
 }
 
+/// Calcula la duración promedio de todos los trades (en milisegundos)
+pub fn calculate_average_trade_duration(trades: &[Trade]) -> f64 {
+    if trades.is_empty() {
+        return 0.0;
+    }
+    let total_duration: i64 = trades.iter()
+        .map(|t| t.exit_timestamp - t.entry_timestamp)
+        .sum();
+    total_duration as f64 / trades.len() as f64
+}
+
+/// Calcula la duración promedio de trades ganadores (en milisegundos)
+pub fn calculate_average_winning_trade_duration(trades: &[Trade]) -> f64 {
+    let winning_durations: Vec<i64> = trades.iter()
+        .filter(|t| t.pnl > 0.0)
+        .map(|t| t.exit_timestamp - t.entry_timestamp)
+        .collect();
+    if winning_durations.is_empty() {
+        return 0.0;
+    }
+    winning_durations.iter().sum::<i64>() as f64 / winning_durations.len() as f64
+}
+
+/// Calcula la duración promedio de trades perdedores (en milisegundos)
+pub fn calculate_average_losing_trade_duration(trades: &[Trade]) -> f64 {
+    let losing_durations: Vec<i64> = trades.iter()
+        .filter(|t| t.pnl < 0.0)
+        .map(|t| t.exit_timestamp - t.entry_timestamp)
+        .collect();
+    if losing_durations.is_empty() {
+        return 0.0;
+    }
+    losing_durations.iter().sum::<i64>() as f64 / losing_durations.len() as f64
+}
+
+/// Calcula la racha máxima de trades ganadores consecutivos
+pub fn calculate_max_consecutive_wins(trades: &[Trade]) -> usize {
+    let mut max_streak = 0;
+    let mut current_streak = 0;
+    
+    for trade in trades {
+        if trade.pnl > 0.0 {
+            current_streak += 1;
+            max_streak = max_streak.max(current_streak);
+        } else {
+            current_streak = 0;
+        }
+    }
+    max_streak
+}
+
+/// Calcula la racha máxima de trades perdedores consecutivos
+pub fn calculate_max_consecutive_losses(trades: &[Trade]) -> usize {
+    let mut max_streak = 0;
+    let mut current_streak = 0;
+    
+    for trade in trades {
+        if trade.pnl < 0.0 {
+            current_streak += 1;
+            max_streak = max_streak.max(current_streak);
+        } else {
+            current_streak = 0;
+        }
+    }
+    max_streak
+}
+
+/// Calcula total de profit
+pub fn calculate_total_profit(trades: &[Trade]) -> f64 {
+    trades.iter().filter(|t| t.pnl > 0.0).map(|t| t.pnl).sum()
+}
+
+/// Calcula total de loss (valor absoluto)
+pub fn calculate_total_loss(trades: &[Trade]) -> f64 {
+    trades.iter().filter(|t| t.pnl < 0.0).map(|t| t.pnl.abs()).sum()
+}
+

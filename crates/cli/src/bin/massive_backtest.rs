@@ -20,9 +20,11 @@ use darwinx_backtest_engine::{
     BacktestResult,
 };
 use serde_json;
-use std::fs::File;
+use std::collections::HashMap;
+use std::fs::{File, create_dir_all};
 use std::io::Write;
 use std::path::Path;
+use chrono::NaiveDate;
 use tokio;
 
 /// Configuración para el pipeline de backtest masivo
@@ -37,6 +39,14 @@ struct Config {
     /// Ruta al archivo con datos históricos (CSV o Parquet)
     #[arg(short = 'd', long, default_value = "data/btcusdt_1h.csv")]
     data: String,
+
+    /// Fecha de inicio del backtest (formato: YYYY-MM-DD)
+    #[arg(long)]
+    start_date: Option<String>,
+
+    /// Fecha de fin del backtest (formato: YYYY-MM-DD)
+    #[arg(long)]
+    end_date: Option<String>,
 
     /// Número de mejores estrategias a seleccionar
     #[arg(short, long, default_value_t = 100)]
@@ -96,6 +106,24 @@ struct Config {
     verbose: bool,
 }
 
+/// Parsea una fecha en formato YYYY-MM-DD a timestamp en milisegundos
+fn parse_date(date_str: &str) -> anyhow::Result<i64> {
+    let dt = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+        .map_err(|e| anyhow::anyhow!("Formato de fecha inválido: {}. Use YYYY-MM-DD (ej: 2024-01-01)", e))?;
+    let datetime = dt.and_hms_opt(0, 0, 0)
+        .ok_or_else(|| anyhow::anyhow!("Fecha inválida"))?;
+    Ok(datetime.and_utc().timestamp_millis())
+}
+
+/// Formatea un timestamp en milisegundos a string legible
+fn format_timestamp(ts: i64) -> String {
+    if let Some(dt) = chrono::DateTime::from_timestamp_millis(ts) {
+        dt.format("%Y-%m-%d %H:%M:%S").to_string()
+    } else {
+        format!("{}", ts)
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = Config::parse();
@@ -106,6 +134,12 @@ async fn main() -> anyhow::Result<()> {
         println!("📋 Configuración:");
         println!("   Estrategias a generar: {}", config.strategies);
         println!("   Archivo de datos:     {}", config.data);
+        if let Some(start) = &config.start_date {
+            println!("   Fecha inicio:        {}", start);
+        }
+        if let Some(end) = &config.end_date {
+            println!("   Fecha fin:           {}", end);
+        }
         println!("   Top N a seleccionar:  {}", config.top);
         println!("   Balance inicial:      ${:.2}", config.initial_balance);
         println!("   Comisión:            {:.4}%", config.commission_rate * 100.0);
@@ -141,7 +175,7 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or("")
         .to_lowercase();
     
-    let candles = match extension.as_str() {
+    let mut candles = match extension.as_str() {
         "parquet" => {
             if config.verbose {
                 println!("   📦 Detectado formato Parquet");
@@ -188,7 +222,42 @@ async fn main() -> anyhow::Result<()> {
         }
     };
     
+    // Filtrar por fecha si se especificó
+    if let Some(start) = &config.start_date {
+        let start_ts = parse_date(start)?;
+        let before = candles.len();
+        candles.retain(|c| c.timestamp >= start_ts);
+        if config.verbose {
+            println!("   📅 Filtrado por fecha inicio ({}): {} velas eliminadas", 
+                start, before - candles.len());
+        }
+    }
+
+    if let Some(end) = &config.end_date {
+        let end_ts = parse_date(end)?;
+        let before = candles.len();
+        candles.retain(|c| c.timestamp <= end_ts);
+        if config.verbose {
+            println!("   📅 Filtrado por fecha fin ({}): {} velas eliminadas", 
+                end, before - candles.len());
+        }
+    }
+
+    // Validar que haya velas después del filtrado
+    if candles.is_empty() {
+        return Err(anyhow::anyhow!(
+            "No hay velas después del filtrado por fecha. Verifica las fechas especificadas."
+        ));
+    }
+
     if config.verbose {
+        if config.start_date.is_some() || config.end_date.is_some() {
+            let start_ts = candles[0].timestamp;
+            let end_ts = candles[candles.len() - 1].timestamp;
+            println!("   📅 Período del backtest: {} - {}", 
+                format_timestamp(start_ts), 
+                format_timestamp(end_ts));
+        }
         println!();
     }
 
@@ -218,6 +287,13 @@ async fn main() -> anyhow::Result<()> {
     }
     
     let engine = PolarsVectorizedBacktestEngine::new();
+    
+    // Crear un mapa de nombre de estrategia -> AST para guardar las definiciones completas
+    use std::collections::HashMap;
+    let strategies_map: HashMap<String, darwinx_generator::StrategyAST> = strategies
+        .iter()
+        .map(|s| (s.name.clone(), s.clone()))
+        .collect();
     
     let start_time = std::time::Instant::now();
     let results = match engine.run_massive_backtest(strategies, candles, &backtest_config).await {
@@ -329,15 +405,24 @@ async fn main() -> anyhow::Result<()> {
             println!("      Sharpe Ratio:     {:.3}", m.sharpe_ratio);
             println!("      Sortino Ratio:    {:.3}", m.sortino_ratio);
             println!("      Profit Factor:   {:.3}", m.profit_factor);
-            println!("      Max Drawdown:     {:.2}%", m.max_drawdown * 100.0);
+            println!("      Max Drawdown:     {:.2}%", m.max_drawdown_percent * 100.0);
             println!("      Win Rate:         {:.2}%", m.win_rate * 100.0);
             println!("      Total Trades:     {}", m.total_trades);
             println!("      Avg Win:          ${:.2}", m.average_win);
             println!("      Avg Loss:         ${:.2}", m.average_loss);
+            println!("      Total Profit:     ${:.2}", m.total_profit);
+            println!("      Total Loss:       ${:.2}", m.total_loss);
+            println!("      Avg Trade Duration: {:.1} horas", m.average_trade_duration_ms / (1000.0 * 60.0 * 60.0));
+            println!("      Avg Win Duration:   {:.1} horas", m.average_winning_trade_duration_ms / (1000.0 * 60.0 * 60.0));
+            println!("      Avg Loss Duration:  {:.1} horas", m.average_losing_trade_duration_ms / (1000.0 * 60.0 * 60.0));
+            println!("      Max Consecutive Wins: {}", m.max_consecutive_wins);
+            println!("      Max Consecutive Losses: {}", m.max_consecutive_losses);
+            println!("      Trades/Month:     {:.1}", m.trades_per_month);
+            println!("      Trades/Year:      {:.1}", m.trades_per_year);
         } else {
-            println!("{}. {} | Return: {:.2}% | Sharpe: {:.3} | Trades: {} | Win Rate: {:.2}%",
+            println!("{}. {} | Return: {:.2}% | Sharpe: {:.3} | Trades: {} | Win Rate: {:.2}% | DD: {:.2}%",
                 i + 1, result.strategy_name, 
-                m.total_return * 100.0, m.sharpe_ratio, m.total_trades, m.win_rate * 100.0);
+                m.total_return * 100.0, m.sharpe_ratio, m.total_trades, m.win_rate * 100.0, m.max_drawdown_percent * 100.0);
         }
     }
     
@@ -381,15 +466,23 @@ async fn main() -> anyhow::Result<()> {
             },
             "top_strategies": top_strategies.iter().enumerate().map(|(i, r)| {
                 let score = ranked[i].0;
+                // Obtener la definición completa de la estrategia (AST)
+                let strategy_ast = strategies_map.get(&r.strategy_name);
                 serde_json::json!({
                     "rank": i + 1,
                     "score": score,
                     "strategy_name": r.strategy_name,
+                    "strategy": strategy_ast, // AST completo de la estrategia
                     "metrics": r.metrics,
                     "total_trades": r.trades.len(),
                 })
             }).collect::<Vec<_>>(),
         });
+        
+        // Crear directorio si no existe
+        if let Some(parent) = Path::new(output_path).parent() {
+            create_dir_all(parent)?;
+        }
         
         let json = serde_json::to_string_pretty(&output_data)?;
         let mut file = File::create(output_path)?;
