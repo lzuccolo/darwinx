@@ -5,7 +5,7 @@
 //! Ejemplo:
 //!   cargo run --bin massive_backtest -- \
 //!     --strategies 10000 \
-//!     --data data/btcusdt_1h.csv \
+//!     --data data/BTCUSDT_1h.parquet \
 //!     --top 100 \
 //!     --min-trades 10 \
 //!     --min-win-rate 0.4 \
@@ -13,7 +13,7 @@
 
 use clap::Parser;
 use darwinx_generator::RandomGenerator;
-use darwinx_data::CsvLoader;
+use darwinx_data::{CsvLoader, ParquetLoader};
 use darwinx_backtest_engine::{
     PolarsVectorizedBacktestEngine,
     BacktestConfig,
@@ -22,6 +22,7 @@ use darwinx_backtest_engine::{
 use serde_json;
 use std::fs::File;
 use std::io::Write;
+use std::path::Path;
 use tokio;
 
 /// Configuración para el pipeline de backtest masivo
@@ -33,8 +34,8 @@ struct Config {
     #[arg(short, long, default_value_t = 10000)]
     strategies: usize,
 
-    /// Ruta al archivo CSV con datos históricos
-    #[arg(short, long, default_value = "data/btcusdt_1h.csv")]
+    /// Ruta al archivo con datos históricos (CSV o Parquet)
+    #[arg(short = 'd', long, default_value = "data/btcusdt_1h.csv")]
     data: String,
 
     /// Número de mejores estrategias a seleccionar
@@ -133,18 +134,57 @@ async fn main() -> anyhow::Result<()> {
         println!("📊 FASE 2: Cargando datos históricos...");
     }
     
-    let candles = match CsvLoader::load(&config.data) {
-        Ok(candles) => {
+    // Detectar formato por extensión del archivo
+    let data_path = Path::new(&config.data);
+    let extension = data_path.extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    
+    let candles = match extension.as_str() {
+        "parquet" => {
             if config.verbose {
-                println!("   ✅ Cargadas {} velas desde {}", candles.len(), config.data);
+                println!("   📦 Detectado formato Parquet");
             }
-            candles
+            match ParquetLoader::load(&config.data) {
+                Ok(candles) => {
+                    if config.verbose {
+                        println!("   ✅ Cargadas {} velas desde {}", candles.len(), config.data);
+                    }
+                    candles
+                }
+                Err(e) => {
+                    eprintln!("   ❌ Error al cargar archivo Parquet: {}", e);
+                    eprintln!("   💡 Asegúrate de que el archivo existe y tiene el formato correcto:");
+                    eprintln!("      Columnas: timestamp, open, high, low, close, volume");
+                    return Err(e);
+                }
+            }
         }
-        Err(e) => {
-            eprintln!("   ❌ Error al cargar datos: {}", e);
-            eprintln!("   💡 Asegúrate de que el archivo CSV existe y tiene el formato correcto:");
-            eprintln!("      timestamp,open,high,low,close,volume");
-            return Err(e);
+        "csv" => {
+            if config.verbose {
+                println!("   📄 Detectado formato CSV");
+            }
+            match CsvLoader::load(&config.data) {
+                Ok(candles) => {
+                    if config.verbose {
+                        println!("   ✅ Cargadas {} velas desde {}", candles.len(), config.data);
+                    }
+                    candles
+                }
+                Err(e) => {
+                    eprintln!("   ❌ Error al cargar archivo CSV: {}", e);
+                    eprintln!("   💡 Asegúrate de que el archivo existe y tiene el formato correcto:");
+                    eprintln!("      timestamp,open,high,low,close,volume");
+                    return Err(e);
+                }
+            }
+        }
+        _ => {
+            eprintln!("   ❌ Formato de archivo no soportado: {}", extension);
+            eprintln!("   💡 Formatos soportados: .csv, .parquet");
+            eprintln!("   💡 Archivo especificado: {}", config.data);
+            return Err(anyhow::anyhow!("Formato de archivo no soportado: {}", extension));
         }
     };
     

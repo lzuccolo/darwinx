@@ -18,11 +18,14 @@ bin/
 El script `massive_backtest.sh` compila automáticamente si es necesario y ejecuta el binario:
 
 ```bash
-# Modo debug (por defecto)
+# Modo debug (por defecto) - CSV
 ./bin/massive_backtest.sh --strategies 10000 --data data/btcusdt_1h.csv
 
-# Modo release
-./bin/massive_backtest.sh --release --strategies 10000 --data data/btcusdt_1h.csv
+# Modo release - Parquet (recomendado, más rápido)
+./bin/massive_backtest.sh --release --strategies 10000 --data data/BTCUSDT_1h.parquet
+
+# También puedes usar -d como atajo
+./bin/massive_backtest.sh --release -d data/BTCUSDT_1h.parquet --strategies 10000
 ```
 
 ### Opción 2: Script de build (recomendado para producción/testing)
@@ -40,8 +43,27 @@ Compila y copia los binarios a `bin/` (solo en modo release):
 Luego ejecuta directamente:
 
 ```bash
+# CSV
 ./bin/massive_backtest --strategies 10000 --data data/btcusdt_1h.csv
+
+# Parquet (recomendado, más eficiente)
+./bin/massive_backtest --strategies 10000 --data data/BTCUSDT_1h.parquet
 ```
+
+### Formatos de Datos Soportados
+
+El CLI detecta automáticamente el formato del archivo por su extensión:
+
+- **CSV** (`.csv`): Formato texto, fácil de inspeccionar
+- **Parquet** (`.parquet`): Formato binario, más eficiente y rápido de cargar (recomendado)
+
+Ejemplo de formato esperado (mismo para ambos):
+```
+timestamp,open,high,low,close,volume
+1609459200000,29000.0,29500.0,28800.0,29200.0,1500.5
+```
+
+**Nota importante**: Usa `--data` o `-d` para especificar el archivo. El formato se detecta automáticamente.
 
 ### Opción 3: Cargo directamente
 
