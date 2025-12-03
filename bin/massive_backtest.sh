@@ -45,11 +45,13 @@ STOP_LOSS="0.02"  # 2% stop loss
 TAKE_PROFIT="0.06"  # 6% take profit (ratio 3:1 con SL)
 
 # Filtros de calidad
-MIN_TRADES=20
-MIN_WIN_RATE=0.55
-MIN_SHARPE=0.0
-MIN_RETURN=0.10
-MAX_DRAWDOWN=0.3
+# NOTA: Estos filtros son más realistas para permitir que pasen estrategias viables
+# Puedes ajustarlos según tus necesidades
+MIN_TRADES=10          # Mínimo de trades para considerar la estrategia válida
+MIN_WIN_RATE=0.45      # Win rate mínimo (45% es más realista que 55%)
+MIN_SHARPE=0.0         # Sharpe mínimo (0.0 = sin filtro de Sharpe)
+MIN_RETURN=0.05        # Retorno mínimo del 5% sobre balance inicial (más realista)
+MAX_DRAWDOWN=0.4       # Drawdown máximo del 40% (más permisivo)
 
 # Evolución Genética (deja vacío para deshabilitar)
 EVOLVE_GENERATIONS=""  # Ejemplo: "50" para 50 generaciones
