@@ -477,6 +477,50 @@ async fn main() -> anyhow::Result<()> {
             println!("      Sharpe bajo ({}):          {} estrategias", config.min_sharpe, fail_sharpe);
         } else {
             println!("   ⚠️  Ninguna estrategia generó trades!");
+            
+            // DIAGNÓSTICO ADICIONAL: Analizar algunas estrategias para ver por qué no generan trades
+            println!("   🔍 Analizando primeras 5 estrategias sin trades...");
+            let sample_strategies: Vec<(&BacktestResult, Option<&darwinx_generator::StrategyAST>)> = results.iter()
+                .take(5)
+                .map(|r| (r, strategies_map.get(&r.strategy_name)))
+                .collect();
+            
+            for (i, (result, strategy_ast)) in sample_strategies.iter().enumerate() {
+                println!("      Estrategia {}: {}", i + 1, result.strategy_name);
+                println!("         - Trades generados: {}", result.metrics.total_trades);
+                
+                if let Some(ast) = strategy_ast {
+                    println!("         - Entry rules: {} condiciones, operador: {:?}", 
+                        ast.entry_rules.conditions.len(), 
+                        ast.entry_rules.operator);
+                    if !ast.entry_rules.conditions.is_empty() {
+                        println!("         - Primera condición de entrada:");
+                        let first_cond = &ast.entry_rules.conditions[0];
+                        println!("           {} {:?} {:?}", 
+                            first_cond.indicator.name,
+                            first_cond.comparison,
+                            first_cond.value);
+                    }
+                    println!("         - Exit rules: {} condiciones, operador: {:?}", 
+                        ast.exit_rules.conditions.len(), 
+                        ast.exit_rules.operator);
+                } else {
+                    println!("         - ⚠️  AST no disponible para esta estrategia");
+                }
+            }
+            
+            // Contar estrategias con condiciones vacías
+            let empty_entry_rules = results.iter()
+                .filter(|r| {
+                    strategies_map.get(&r.strategy_name)
+                        .map(|ast| ast.entry_rules.conditions.is_empty())
+                        .unwrap_or(true)
+                })
+                .count();
+            
+            if empty_entry_rules > 0 {
+                println!("   ⚠️  {} estrategias tienen condiciones de entrada vacías!", empty_entry_rules);
+            }
         }
     }
     

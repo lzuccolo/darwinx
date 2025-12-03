@@ -150,6 +150,16 @@ impl PolarsVectorizedBacktestEngine {
             .collect()
             .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Polars error: {}", e)))?;
 
+        // DIAGNÓSTICO: Contar cuántas señales de entrada hay
+        let entry_signal_col = df_with_signals.column("entry_signal")
+            .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to get entry_signal: {}", e)))?;
+        let entry_signals = entry_signal_col.bool()
+            .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to cast entry_signal: {}", e)))?;
+        let true_signals = entry_signals.iter().filter(|opt| opt.unwrap_or(false)).count();
+        
+        // Guardar el número de señales en metadata para diagnóstico
+        let total_candles = df_with_signals.height();
+
         // Simular trades basado en señales
         let trades = self.calculate_trades_from_signals(&df_with_signals, config)?;
 
