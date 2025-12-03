@@ -413,6 +413,73 @@ async fn main() -> anyhow::Result<()> {
         println!("🏆 FASE 5: Filtrando y rankeando mejores estrategias...");
     }
     
+    // DIAGNÓSTICO: Analizar estadísticas de métricas antes de filtrar
+    if config.verbose && !results.is_empty() {
+        let total_strategies = results.len();
+        let strategies_with_trades: Vec<&BacktestResult> = results.iter()
+            .filter(|r| r.metrics.total_trades > 0)
+            .collect();
+        
+        if !strategies_with_trades.is_empty() {
+            let mut total_trades_stats = Vec::new();
+            let mut win_rate_stats = Vec::new();
+            let mut return_stats = Vec::new();
+            let mut drawdown_stats = Vec::new();
+            let mut sharpe_stats = Vec::new();
+            
+            for r in &strategies_with_trades {
+                total_trades_stats.push(r.metrics.total_trades as f64);
+                win_rate_stats.push(r.metrics.win_rate);
+                return_stats.push(r.metrics.total_return);
+                drawdown_stats.push(r.metrics.max_drawdown);
+                sharpe_stats.push(r.metrics.sharpe_ratio);
+            }
+            
+            fn stats(vals: &[f64]) -> (f64, f64, f64, f64) {
+                if vals.is_empty() { return (0.0, 0.0, 0.0, 0.0); }
+                let min = vals.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+                let max = vals.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+                let sum: f64 = vals.iter().sum();
+                let avg = sum / vals.len() as f64;
+                (min, max, avg, sum)
+            }
+            
+            let (trades_min, trades_max, trades_avg, _) = stats(&total_trades_stats);
+            let (wr_min, wr_max, wr_avg, _) = stats(&win_rate_stats);
+            let (ret_min, ret_max, ret_avg, _) = stats(&return_stats);
+            let (dd_min, dd_max, dd_avg, _) = stats(&drawdown_stats);
+            let (sharpe_min, sharpe_max, sharpe_avg, _) = stats(&sharpe_stats);
+            
+            println!("   📊 Diagnóstico de métricas ({} estrategias con trades de {} total):", strategies_with_trades.len(), total_strategies);
+            println!("      Total Trades:  min={:.1}, max={:.1}, avg={:.1} (requiere >= {})", 
+                trades_min, trades_max, trades_avg, config.min_trades);
+            println!("      Win Rate:      min={:.3}, max={:.3}, avg={:.3} (requiere >= {:.3})", 
+                wr_min, wr_max, wr_avg, config.min_win_rate);
+            println!("      Total Return:  min={:.4}, max={:.4}, avg={:.4} (requiere >= {:.4})", 
+                ret_min, ret_max, ret_avg, config.min_return);
+            println!("      Max Drawdown:  min={:.4}, max={:.4}, avg={:.4} (requiere <= {:.4})", 
+                dd_min, dd_max, dd_avg, config.max_drawdown);
+            println!("      Sharpe Ratio:  min={:.3}, max={:.3}, avg={:.3} (requiere >= {:.3})", 
+                sharpe_min, sharpe_max, sharpe_avg, config.min_sharpe);
+            
+            // Contar cuántas fallan cada filtro
+            let fail_trades = results.iter().filter(|r| r.metrics.total_trades < config.min_trades).count();
+            let fail_winrate = results.iter().filter(|r| r.metrics.win_rate < config.min_win_rate).count();
+            let fail_return = results.iter().filter(|r| r.metrics.total_return < config.min_return).count();
+            let fail_drawdown = results.iter().filter(|r| r.metrics.max_drawdown > config.max_drawdown).count();
+            let fail_sharpe = results.iter().filter(|r| r.metrics.sharpe_ratio < config.min_sharpe).count();
+            
+            println!("   🔍 Estrategias que fallan cada filtro:");
+            println!("      Faltan trades ({}):        {} estrategias", config.min_trades, fail_trades);
+            println!("      Win rate bajo ({}):        {} estrategias", config.min_win_rate, fail_winrate);
+            println!("      Return bajo ({}):          {} estrategias", config.min_return, fail_return);
+            println!("      Drawdown alto ({}):        {} estrategias", config.max_drawdown, fail_drawdown);
+            println!("      Sharpe bajo ({}):          {} estrategias", config.min_sharpe, fail_sharpe);
+        } else {
+            println!("   ⚠️  Ninguna estrategia generó trades!");
+        }
+    }
+    
     // Filtrar estrategias con métricas mínimas
     let filtered: Vec<&BacktestResult> = results
         .iter()

@@ -2,11 +2,11 @@
   "config": {
     "data_file": "data/BTCUSDT_1h.parquet",
     "filters": {
-      "max_drawdown": 0.3,
-      "min_return": 0.1,
+      "max_drawdown": 0.4,
+      "min_return": 0.05,
       "min_sharpe": 0.0,
-      "min_trades": 20,
-      "min_win_rate": 0.55
+      "min_trades": 10,
+      "min_win_rate": 0.45
     },
     "score_weights": [
       0.3,
