@@ -15,13 +15,13 @@
       0.15,
       0.15
     ],
-    "strategies_generated": 100000,
+    "strategies_generated": 10000,
     "top_n": 100
   },
   "summary": {
     "passed_filters": 0,
     "top_selected": 0,
-    "total_backtested": 100000
+    "total_backtested": 10000
   },
   "top_strategies": []
 }

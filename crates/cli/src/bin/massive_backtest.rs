@@ -521,6 +521,32 @@ async fn main() -> anyhow::Result<()> {
             if empty_entry_rules > 0 {
                 println!("   ⚠️  {} estrategias tienen condiciones de entrada vacías!", empty_entry_rules);
             }
+            
+            // Analizar tipos de condiciones más comunes
+            let mut condition_types: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+            for result in results.iter().take(100) { // Muestra de 100 estrategias
+                if let Some(ast) = strategies_map.get(&result.strategy_name) {
+                    for cond in &ast.entry_rules.conditions {
+                        let key = format!("{:?}", cond.comparison);
+                        *condition_types.entry(key).or_insert(0) += 1;
+                    }
+                }
+            }
+            
+            if !condition_types.is_empty() {
+                println!("   📊 Tipos de comparaciones en muestra de 100 estrategias:");
+                let mut sorted: Vec<_> = condition_types.iter().collect();
+                sorted.sort_by(|a, b| b.1.cmp(a.1));
+                for (comp_type, count) in sorted.iter().take(5) {
+                    println!("      {}: {} ocurrencias", comp_type, count);
+                }
+            }
+            
+            println!("   💡 Posibles causas:");
+            println!("      - Las condiciones pueden ser demasiado específicas (ej: Equals con valores exactos)");
+            println!("      - Las condiciones con operador 'And' requieren que TODAS se cumplan simultáneamente");
+            println!("      - Los indicadores pueden no estar calculándose correctamente");
+            println!("      - Las condiciones 'CrossesAbove/Below' están simplificadas a comparaciones directas");
         }
     }
     

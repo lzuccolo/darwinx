@@ -18,7 +18,7 @@ START_DATE="2024-12-01"  # Ejemplo: "2024-01-01"
 END_DATE="2025-03-01"    # Ejemplo: "2024-12-31"
 
 # Número de estrategias a generar
-STRATEGIES=100000
+STRATEGIES=10000
 
 # Top N estrategias a seleccionar
 TOP=100

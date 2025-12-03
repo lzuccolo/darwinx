@@ -78,7 +78,8 @@ impl RandomGenerator {
     fn random_condition(&self, rng: &mut impl Rng) -> Condition {
         let indicator = self.random_indicator(rng);
         let comparison = self.random_comparison(rng);
-        let value = self.random_value(rng);
+        // Mejorar: generar valor de comparación apropiado según la categoría del indicador
+        let value = self.random_value_for_indicator(&indicator, rng);
 
         Condition {
             indicator,
@@ -115,21 +116,110 @@ impl RandomGenerator {
     }
 
     fn random_comparison(&self, rng: &mut impl Rng) -> Comparison {
-        match rng.gen_range(0..5) {
-            0 => Comparison::GreaterThan,
-            1 => Comparison::LessThan,
-            2 => Comparison::CrossesAbove,
-            3 => Comparison::CrossesBelow,
-            _ => Comparison::Equals,
+        // Reducir probabilidad de Equals (muy restrictivo) y Crosses (simplificado)
+        // Priorizar GreaterThan y LessThan que son más realistas
+        match rng.gen_range(0..10) {
+            0..=3 => Comparison::GreaterThan,  // 40% probabilidad
+            4..=7 => Comparison::LessThan,      // 40% probabilidad
+            8 => Comparison::CrossesAbove,      // 10% probabilidad
+            9 => Comparison::CrossesBelow,      // 10% probabilidad
+            _ => Comparison::Equals,            // Muy raro (solo si hay error)
         }
     }
 
-    fn random_value(&self, rng: &mut impl Rng) -> ConditionValue {
+    /// Genera un valor de comparación apropiado para un indicador dado
+    /// Evita comparaciones sin sentido entre indicadores de diferentes escalas
+    fn random_value_for_indicator(&self, indicator: &IndicatorType, rng: &mut impl Rng) -> ConditionValue {
+        use darwinx_indicators::metadata::IndicatorCategory;
+        
+        // Obtener metadata del indicador para conocer su categoría
+        let meta = match registry::get(&indicator.name) {
+            Some(m) => m,
+            None => {
+                // Fallback: usar generación aleatoria estándar
+                return self.random_value_fallback(rng);
+            }
+        };
+        
+        match meta.category {
+            IndicatorCategory::Momentum => {
+                // Indicadores de momentum (RSI, Stochastic, MFI) están en rango 0-100
+                // Comparar SOLO con números en ese rango (evitar comparaciones con otros indicadores por ahora)
+                // Esto evita problemas de escala
+                ConditionValue::Number(rng.gen_range(20.0..80.0)) // Rango típico para momentum
+            }
+            IndicatorCategory::Trend => {
+                // Indicadores de tendencia (SMA, EMA, etc.) están en escala de precio
+                // Comparar con precio (más simple y realista)
+                // O con otro indicador de tendencia, pero filtrar el actual
+                match rng.gen_range(0..4) {
+                    0..=2 => ConditionValue::Price, // 75% probabilidad: comparar con precio
+                    3 => {
+                        // Comparar con otro indicador de tendencia (diferente al actual)
+                        let trend_indicators: Vec<_> = registry::by_category(IndicatorCategory::Trend)
+                            .into_iter()
+                            .filter(|m| m.name != indicator.name) // Evitar comparar consigo mismo
+                            .collect();
+                        if !trend_indicators.is_empty() {
+                            let selected = trend_indicators.choose(rng).unwrap();
+                            let params: Vec<f64> = selected.parameters
+                                .iter()
+                                .map(|p| self.discretize_parameter(p, rng))
+                                .collect();
+                            ConditionValue::Indicator(IndicatorType::new(selected.name.to_string(), params))
+                        } else {
+                            ConditionValue::Price
+                        }
+                    }
+                    _ => ConditionValue::Price,
+                }
+            }
+            IndicatorCategory::Volatility => {
+                // Indicadores de volatilidad (ATR, Bollinger, Keltner) están en escala de precio/volatilidad
+                // Comparar principalmente con precio (más simple)
+                ConditionValue::Price
+            }
+            IndicatorCategory::Volume => {
+                // Indicadores de volumen: OBV (acumulativo, puede ser muy grande), MFI (0-100), VWAP (precio)
+                // Para evitar problemas, preferir comparaciones con precio o números
+                match indicator.name.as_str() {
+                    "obv" => {
+                        // OBV es acumulativo, evitar comparaciones directas - solo con precio
+                        ConditionValue::Price
+                    }
+                    "mfi" => {
+                        // MFI es 0-100, como momentum - solo números
+                        ConditionValue::Number(rng.gen_range(20.0..80.0))
+                    }
+                    "vwap" => {
+                        // VWAP es precio - solo con precio
+                        ConditionValue::Price
+                    }
+                    _ => {
+                        // Fallback para otros indicadores de volumen
+                        ConditionValue::Price
+                    }
+                }
+            }
+            _ => {
+                // Para otras categorías, usar fallback
+                self.random_value_fallback(rng)
+            }
+        }
+    }
+    
+    /// Fallback para generación aleatoria estándar
+    fn random_value_fallback(&self, rng: &mut impl Rng) -> ConditionValue {
         match rng.gen_range(0..3) {
             0 => ConditionValue::Number(rng.gen_range(20.0..80.0)),
             1 => ConditionValue::Price,
             _ => ConditionValue::Indicator(self.random_indicator(rng)),
         }
+    }
+    
+    /// Método original mantenido por compatibilidad (ahora es fallback)
+    fn random_value(&self, rng: &mut impl Rng) -> ConditionValue {
+        self.random_value_fallback(rng)
     }
 
     /// Discretiza un parámetro según su tipo para evitar combinaciones infinitas

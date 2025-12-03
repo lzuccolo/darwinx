@@ -156,9 +156,18 @@ impl PolarsVectorizedBacktestEngine {
         let entry_signals = entry_signal_col.bool()
             .map_err(|e| BacktestError::DataError(anyhow::anyhow!("Failed to cast entry_signal: {}", e)))?;
         let true_signals = entry_signals.iter().filter(|opt| opt.unwrap_or(false)).count();
+        let total_candles_signals = df_with_signals.height();
         
-        // Guardar el número de señales en metadata para diagnóstico
-        let total_candles = df_with_signals.height();
+        // Logging de diagnóstico: si no hay señales, puede indicar un problema
+        if true_signals == 0 {
+            // Solo loggear ocasionalmente para no saturar (cada 10000 estrategias aproximadamente)
+            // Usar hash del nombre para distribuir el logging
+            let hash = strategy.name.chars().map(|c| c as u32).sum::<u32>();
+            if hash % 10000 == 0 {
+                eprintln!("⚠️  Estrategia '{}' no generó señales de entrada ({} velas procesadas)", 
+                    strategy.name, total_candles_signals);
+            }
+        }
 
         // Simular trades basado en señales
         let trades = self.calculate_trades_from_signals(&df_with_signals, config)?;
