@@ -202,6 +202,55 @@
 **Estimación**: 1 semana  
 **Depende**: Backtest masivo
 
+## 🔄 RETROALIMENTACIÓN Y APRENDIZAJE
+
+### Persistencia de Mejores Estrategias (SQLite)
+- [x] ✅ Integrar guardado de top N estrategias en SQLite usando `strategy-store` - COMPLETADO
+- [x] ✅ Crear tabla `best_strategies` o usar `strategies` existente con flag `is_best` - COMPLETADO
+- [x] ✅ Guardar métricas completas de backtest junto con estrategia - COMPLETADO
+- [x] ✅ Sistema de deduplicación (evitar guardar estrategias idénticas) - COMPLETADO
+- [x] ✅ Timestamp y metadata de ejecución (dataset, fecha, configuración) - COMPLETADO
+- [x] ✅ Función para cargar mejores estrategias históricas desde SQLite - COMPLETADO
+- [ ] Tests de persistencia y carga desde SQLite
+
+**Prioridad**: 🔥 CRÍTICA  
+**Estado**: 95% completo - Funcional, faltan tests  
+**Nota**: SQLite es la fuente de verdad principal. JSON solo para consulta rápida de ejecución actual.
+
+### JSON como Resultado de Ejecución (Opcional)
+- [ ] Mantener opción `--output` para guardar JSON de ejecución actual
+- [ ] JSON solo para análisis rápido inmediato, no para persistencia
+- [ ] Documentar que SQLite es la persistencia principal
+- [ ] Considerar eliminar JSON por defecto o hacerlo opcional explícito
+
+**Prioridad**: 🟡 BAJA  
+**Estimación**: 0.5 semanas  
+**Depende**: Persistencia de Mejores Estrategias (SQLite)
+
+### Integración Genetic Generator con Backtest
+- [x] ✅ Crear función de fitness que combine métricas de backtest - COMPLETADO
+- [x] ✅ Cargar mejores estrategias desde SQLite como población inicial - COMPLETADO
+- [x] ✅ Integrar `GeneticGenerator` con resultados de backtest masivo - COMPLETADO
+- [x] ✅ Evolución iterativa: backtest → guardar en SQLite → cargar → evolve → backtest - COMPLETADO
+- [x] ✅ Configuración de parámetros genéticos (mutation rate, elite size, etc.) - COMPLETADO
+- [ ] Tests de evolución end-to-end con persistencia SQLite
+
+**Prioridad**: 🔥 ALTA  
+**Estado**: 95% completo - Funcional, faltan tests  
+**Depende**: Persistencia de Mejores Estrategias (SQLite)
+
+### Mejoras en Generación de Estrategias
+- [ ] Detectar timeframe de datos y filtrar estrategias incompatibles antes del backtest
+- [ ] Agregar soporte para valores históricos de indicadores (RSI[2], EMA[-1], etc.)
+- [ ] Validación semántica de comparaciones (warnings para combinaciones poco comunes)
+- [ ] Implementar agregación de velas para timeframes mayores (H4 desde H1, D1 desde H4)
+- [ ] Función `is_timeframe_compatible()` para filtrar estrategias
+- [ ] Tests de compatibilidad de timeframes
+
+**Prioridad**: 🔥 MEDIA  
+**Estimación**: 1 semana  
+**Depende**: Pipeline de Generación y Backtest Masivo
+
 ## 🔧 MEJORAS Y REFACTORING
 
 ### Strategy Generator

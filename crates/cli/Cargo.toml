@@ -15,6 +15,7 @@ darwinx-core = { workspace = true }
 darwinx-data = { workspace = true }
 darwinx-generator = { workspace = true }
 darwinx-backtest-engine = { path = "../backtest-engine" }
+darwinx-store = { workspace = true }
 
 # CLI
 clap = { workspace = true }

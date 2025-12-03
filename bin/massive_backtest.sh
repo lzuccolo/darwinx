@@ -24,7 +24,7 @@ STRATEGIES=100000
 TOP=100
 
 # Balance inicial
-INITIAL_BALANCE=1000.0
+INITIAL_BALANCE=10000.0
 
 # Comisión por trade (como porcentaje, ej: 0.001 = 0.1%)
 COMMISSION_RATE=0.001
@@ -33,20 +33,32 @@ COMMISSION_RATE=0.001
 SLIPPAGE_BPS=5.0
 
 # Riesgo por trade como porcentaje del balance (ej: 0.02 = 2%)
+# NOTA: Si hay stop loss, esto representa el riesgo máximo en dólares
+# Si no hay stop loss, esto es el porcentaje del balance a usar por trade
 RISK_PER_TRADE=0.02
 
 # Stop Loss como porcentaje del precio de entrada (ej: 0.02 = 2%, deja vacío para deshabilitar)
-STOP_LOSS=""  # Ejemplo: "0.02"
+# Con SL activo, el position sizing se calcula para arriesgar RISK_PER_TRADE del balance
+STOP_LOSS="0.02"  # 2% stop loss
 
 # Take Profit como porcentaje del precio de entrada (ej: 0.05 = 5%, deja vacío para deshabilitar)
-TAKE_PROFIT=""  # Ejemplo: "0.05"
+TAKE_PROFIT="0.06"  # 6% take profit (ratio 3:1 con SL)
 
 # Filtros de calidad
-MIN_TRADES=10
-MIN_WIN_RATE=0.5
+MIN_TRADES=20
+MIN_WIN_RATE=0.55
 MIN_SHARPE=0.0
-MIN_RETURN=0.00
-MAX_DRAWDOWN=0.5
+MIN_RETURN=0.10
+MAX_DRAWDOWN=0.3
+
+# Evolución Genética (deja vacío para deshabilitar)
+EVOLVE_GENERATIONS=""  # Ejemplo: "50" para 50 generaciones
+EVOLVE_POPULATION=100  # Tamaño de población para evolución
+EVOLVE_MUTATION_RATE=0.1  # Tasa de mutación (0.0-1.0)
+EVOLVE_ELITE_SIZE=10  # Tamaño de elite preservado
+
+# Cargar mejores estrategias históricas desde SQLite (deja vacío para deshabilitar)
+LOAD_BEST=""  # Ejemplo: "50" para cargar 50 mejores estrategias
 
 # Pesos para el score compuesto (Sharpe, Sortino, Profit Factor, Return, Drawdown)
 # Formato: 5 valores separados por comas
@@ -56,7 +68,7 @@ SCORE_WEIGHTS="0.3,0.2,0.2,0.15,0.15"
 SHOW_TOP=10
 
 # Guardar resultados en archivo JSON (deja vacío para no guardar)
-OUTPUT_FILE="results/massive_backtest_btcusdt_1h_2024-12-01_2025-03-01_100000_100_100000_0.001_5_0.02_10_0.5_0.0_0.01_0.5_0.3,0.2,0.2,0.15,0.15_10.json"  # Ejemplo: "resultados_backtest.json"
+OUTPUT_FILE="results/massive_backtest_btcusdt_1h.json"  # Ejemplo: "resultados_backtest.json"
 
 # Modo verbose (true/false)
 VERBOSE=true
@@ -77,6 +89,19 @@ fi
 
 # Construir argumentos del comando
 ARGS=()
+
+# Evolución genética
+if [ -n "$EVOLVE_GENERATIONS" ]; then
+    ARGS+=(--evolve "$EVOLVE_GENERATIONS")
+    ARGS+=(--evolve-population "$EVOLVE_POPULATION")
+    ARGS+=(--evolve-mutation-rate "$EVOLVE_MUTATION_RATE")
+    ARGS+=(--evolve-elite-size "$EVOLVE_ELITE_SIZE")
+fi
+
+# Cargar mejores estrategias históricas
+if [ -n "$LOAD_BEST" ]; then
+    ARGS+=(--load-best "$LOAD_BEST")
+fi
 
 ARGS+=("--strategies" "$STRATEGIES")
 ARGS+=("--data" "$DATA_FILE")

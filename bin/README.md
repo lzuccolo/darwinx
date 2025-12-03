@@ -65,6 +65,50 @@ timestamp,open,high,low,close,volume
 
 **Nota importante**: Usa `--data` o `-d` para especificar el archivo. El formato se detecta automáticamente.
 
+### Evolución Genética
+
+El CLI soporta evolución genética de estrategias después del backtest inicial:
+
+```bash
+# Evolución genética con 50 generaciones
+./bin/massive_backtest.sh --evolve 50
+
+# Con parámetros personalizados
+./bin/massive_backtest.sh \
+  --evolve 100 \
+  --evolve-population 200 \
+  --evolve-mutation-rate 0.15 \
+  --evolve-elite-size 20
+```
+
+**Opciones de evolución:**
+- `--evolve N`: Habilita evolución genética con N generaciones
+- `--evolve-population SIZE`: Tamaño de población (default: 100)
+- `--evolve-mutation-rate RATE`: Tasa de mutación 0.0-1.0 (default: 0.1)
+- `--evolve-elite-size SIZE`: Tamaño de elite preservado (default: 10)
+
+**Flujo de evolución:**
+1. Backtest inicial de estrategias generadas
+2. Selección de top estrategias
+3. Evolución genética de las mejores (crossover + mutación)
+4. Backtest de estrategias evolucionadas
+5. Re-filtrado y re-ranqueo de todas (originales + evolucionadas)
+6. Guardado de mejores finales en SQLite
+
+### Cargar Mejores Estrategias Históricas
+
+Puedes cargar las mejores estrategias guardadas en SQLite para usarlas como población inicial:
+
+```bash
+# Cargar 50 mejores estrategias históricas y generar 50 adicionales aleatorias
+./bin/massive_backtest.sh --load-best 50 --strategies 100
+
+# Combinar con evolución genética
+./bin/massive_backtest.sh --load-best 50 --strategies 100 --evolve 30
+```
+
+**Nota**: `--load-best N` carga N estrategias desde SQLite. Si `--strategies` es mayor, genera el resto aleatoriamente.
+
 ### Opción 3: Cargo directamente
 
 ```bash
@@ -103,9 +147,45 @@ cargo build --release --bin massive_backtest
 - ✅ Scripts de ejecución incluidos
 - ✅ No depende de `target/` directory
 
+## Opciones Avanzadas
+
+### Filtrado por Fechas
+
+```bash
+# Backtest solo en un rango de fechas
+./bin/massive_backtest.sh \
+  --start-date 2024-01-01 \
+  --end-date 2024-12-31 \
+  --data data/BTCUSDT_1h.parquet
+```
+
+### Stop Loss y Take Profit
+
+```bash
+# Stop Loss 2%, Take Profit 5%
+./bin/massive_backtest.sh \
+  --stop-loss 0.02 \
+  --take-profit 0.05 \
+  --data data/BTCUSDT_1h.parquet
+```
+
+### Persistencia en SQLite
+
+Por defecto, las mejores estrategias se guardan en `data/strategies.db`:
+
+```bash
+# Cambiar ruta de base de datos
+./bin/massive_backtest.sh --db-path /path/to/strategies.db
+
+# No guardar en SQLite (solo JSON si se especifica --output)
+./bin/massive_backtest.sh --no-db --output results.json
+```
+
 ## Notas
 
 - Los binarios en `bin/` se generan automáticamente al compilar
 - El script `massive_backtest.sh` detecta si necesita recompilar comparando timestamps
 - Para producción, siempre usar modo `--release` para mejor rendimiento
+- SQLite es la fuente de verdad principal para persistencia de estrategias
+- JSON (`--output`) es solo para consulta rápida de la ejecución actual
 

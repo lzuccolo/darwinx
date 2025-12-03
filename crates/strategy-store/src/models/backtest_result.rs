@@ -20,4 +20,18 @@ pub struct BacktestResult {
     pub profit_factor: Option<f64>,
     pub total_trades: i32,
     pub tested_at: Option<String>,
+    // Extended metrics
+    pub annualized_return: Option<f64>,
+    pub max_drawdown_percent: Option<f64>,
+    pub total_profit: Option<f64>,
+    pub total_loss: Option<f64>,
+    pub max_consecutive_wins: Option<i32>,
+    pub max_consecutive_losses: Option<i32>,
+    pub trades_per_month: Option<f64>,
+    pub trades_per_year: Option<f64>,
+    pub stop_loss_exits: Option<i32>,
+    pub take_profit_exits: Option<i32>,
+    pub signal_exits: Option<i32>,
+    pub end_of_data_exits: Option<i32>,
+    pub composite_score: Option<f64>, // Weighted score from ranking
 }

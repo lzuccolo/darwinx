@@ -12,12 +12,19 @@
 //!     --min-sharpe 0.0
 
 use clap::Parser;
-use darwinx_generator::RandomGenerator;
+use darwinx_generator::{RandomGenerator, GeneticGenerator, GeneticConfig};
 use darwinx_data::{CsvLoader, ParquetLoader};
 use darwinx_backtest_engine::{
     PolarsVectorizedBacktestEngine,
     BacktestConfig,
     BacktestResult,
+};
+use darwinx_store::{
+    init_sqlite,
+    StrategyRepository,
+    BacktestRepository,
+    strategy_ast_to_model,
+    load_best_strategies_for_genetics,
 };
 use serde_json;
 use std::fs::{File, create_dir_all};
@@ -100,9 +107,37 @@ struct Config {
     #[arg(long, value_delimiter = ',', num_args = 5, default_values_t = vec![0.3, 0.2, 0.2, 0.15, 0.15])]
     score_weights: Vec<f64>,
 
-    /// Guardar resultados en archivo JSON
+    /// Guardar resultados en archivo JSON (opcional, solo para consulta rápida)
     #[arg(short, long)]
     output: Option<String>,
+
+    /// Ruta a la base de datos SQLite para persistir mejores estrategias (default: data/strategies.db)
+    #[arg(long, default_value = "data/strategies.db")]
+    db_path: String,
+
+    /// No guardar en SQLite (solo JSON si se especifica --output)
+    #[arg(long)]
+    no_db: bool,
+
+    /// Cargar mejores estrategias desde SQLite para usar como población inicial (número de estrategias a cargar)
+    #[arg(long)]
+    load_best: Option<usize>,
+
+    /// Habilitar evolución genética después del backtest inicial (número de generaciones)
+    #[arg(long)]
+    evolve: Option<usize>,
+
+    /// Tamaño de población para evolución genética (default: 100)
+    #[arg(long, default_value_t = 100)]
+    evolve_population: usize,
+
+    /// Tasa de mutación para evolución genética (default: 0.1)
+    #[arg(long, default_value_t = 0.1)]
+    evolve_mutation_rate: f64,
+
+    /// Tamaño de elite para evolución genética (default: 10)
+    #[arg(long, default_value_t = 10)]
+    evolve_elite_size: usize,
 
     /// Mostrar top N estrategias en consola
     #[arg(long, default_value_t = 10)]
@@ -147,6 +182,9 @@ async fn main() -> anyhow::Result<()> {
         if let Some(end) = &config.end_date {
             println!("   Fecha fin:           {}", end);
         }
+        if let Some(load_count) = config.load_best {
+            println!("   Cargar desde DB:     {} estrategias", load_count);
+        }
         println!("   Top N a seleccionar:  {}", config.top);
         println!("   Balance inicial:      ${:.2}", config.initial_balance);
         println!("   Comisión:            {:.4}%", config.commission_rate * 100.0);
@@ -167,11 +205,49 @@ async fn main() -> anyhow::Result<()> {
     if config.verbose {
         println!("📝 FASE 1: Generando estrategias masivamente...");
     }
+    
     let generator = RandomGenerator::new();
-    let strategies = generator.generate_batch(config.strategies);
+    let mut strategies = Vec::new();
+    
+    // Cargar mejores estrategias desde SQLite si se especifica
+    if let Some(load_count) = config.load_best {
+        if config.verbose {
+            println!("   🔄 Cargando {} mejores estrategias desde SQLite...", load_count);
+        }
+        
+        match load_best_strategies_for_genetics(&config.db_path, load_count).await {
+            Ok(loaded_strategies) => {
+                strategies.extend(loaded_strategies);
+                if config.verbose {
+                    println!("   ✅ Cargadas {} estrategias desde SQLite", strategies.len());
+                }
+            }
+            Err(e) => {
+                eprintln!("   ⚠️  Error al cargar estrategias desde SQLite: {}", e);
+                eprintln!("   💡 Continuando con generación aleatoria completa...");
+            }
+        }
+    }
+    
+    // Completar con estrategias aleatorias si es necesario
+    let remaining = config.strategies.saturating_sub(strategies.len());
+    if remaining > 0 {
+        if config.verbose {
+            if !strategies.is_empty() {
+                println!("   🎲 Generando {} estrategias aleatorias adicionales...", remaining);
+            } else {
+                println!("   🎲 Generando {} estrategias aleatorias...", remaining);
+            }
+        }
+        let random_strategies = generator.generate_batch(remaining);
+        strategies.extend(random_strategies);
+    }
     
     if config.verbose {
-        println!("   ✅ Generadas {} estrategias\n", strategies.len());
+        println!("   ✅ Total {} estrategias preparadas ({} desde DB, {} aleatorias)\n", 
+            strategies.len(),
+            config.load_best.unwrap_or(0),
+            strategies.len() - config.load_best.unwrap_or(0));
     }
 
     // ==========================================
@@ -310,8 +386,10 @@ async fn main() -> anyhow::Result<()> {
         .map(|s| (s.name.clone(), s.clone()))
         .collect();
     
+    // Clonar candles para poder usarlo después si hay evolución
+    let candles_for_backtest = candles.clone();
     let start_time = std::time::Instant::now();
-    let results = match engine.run_massive_backtest(strategies, candles, &backtest_config).await {
+    let results = match engine.run_massive_backtest(strategies, candles_for_backtest, &backtest_config).await {
         Ok(results) => {
             let elapsed = start_time.elapsed();
             if config.verbose {
@@ -404,19 +482,195 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // ==========================================
-    // FASE 6: Mostrar Resultados
+    // FASE 6: Evolución Genética (opcional)
+    // ==========================================
+    let mut all_results = results.clone();
+    let mut all_strategies_map = strategies_map.clone();
+    
+    // Clonar datos necesarios antes del bloque de evolución
+    let top_strategy_names: Vec<String> = top_strategies.iter().map(|r| r.strategy_name.clone()).collect();
+    let top_strategies_metrics: Vec<(String, darwinx_backtest_engine::BacktestMetrics)> = top_strategies
+        .iter()
+        .map(|r| (r.strategy_name.clone(), r.metrics.clone()))
+        .collect();
+    
+    if let Some(generations) = config.evolve {
+        if config.verbose {
+            println!("🧬 FASE 6: Evolución Genética ({} generaciones)...", generations);
+        }
+
+        // Crear mapa de estrategia -> métricas para función de fitness
+        let fitness_map: HashMap<String, darwinx_backtest_engine::BacktestMetrics> = top_strategies_metrics
+            .into_iter()
+            .collect();
+
+        // Función de fitness basada en métricas de backtest
+        let weights = config.score_weights.clone();
+        let fitness_map_clone = fitness_map.clone();
+        let fitness_fn = move |strategy: &darwinx_generator::StrategyAST| -> f64 {
+            if let Some(metrics) = fitness_map_clone.get(&strategy.name) {
+                // Normalizar métricas (similar al scoring)
+                let sharpe_norm = (metrics.sharpe_ratio + 2.0) / 4.0; // -2 a 2 -> 0 a 1
+                let sortino_norm = (metrics.sortino_ratio + 2.0) / 4.0;
+                let pf_norm = (metrics.profit_factor.min(5.0)) / 5.0; // 0 a 5 -> 0 a 1
+                let return_norm = (metrics.total_return + 1.0) / 2.0; // -1 a 1 -> 0 a 1
+                let dd_norm = 1.0 - metrics.max_drawdown_percent.min(1.0); // Invertir (menor es mejor)
+
+                // Score compuesto
+                weights[0] * sharpe_norm +
+                weights[1] * sortino_norm +
+                weights[2] * pf_norm +
+                weights[3] * return_norm +
+                weights[4] * dd_norm
+            } else {
+                // Si no tiene métricas, usar complejidad como proxy
+                -(strategy.complexity() as f64) * 0.1 // Penalizar complejidad
+            }
+        };
+
+        // Obtener ASTs de las top estrategias usando nombres clonados
+        let top_asts: Vec<darwinx_generator::StrategyAST> = top_strategy_names
+            .iter()
+            .filter_map(|name| strategies_map.get(name).cloned())
+            .collect();
+
+        if top_asts.is_empty() {
+            if config.verbose {
+                println!("   ⚠️  No hay estrategias para evolucionar\n");
+            }
+        } else {
+            // Configurar generador genético
+            let genetic_config = GeneticConfig {
+                population_size: config.evolve_population,
+                generations,
+                mutation_rate: config.evolve_mutation_rate,
+                elite_size: config.evolve_elite_size,
+                tournament_size: 3,
+            };
+            let genetic_gen = GeneticGenerator::new(genetic_config);
+
+            if config.verbose {
+                println!("   🧬 Población inicial: {} estrategias", top_asts.len());
+                println!("   🧬 Tamaño de población: {}", config.evolve_population);
+                println!("   🧬 Generaciones: {}", generations);
+            }
+
+            // Evolucionar
+            let evolved_strategies = genetic_gen.evolve(top_asts, fitness_fn);
+
+            if config.verbose {
+                println!("   ✅ Evolución completada: {} estrategias evolucionadas", evolved_strategies.len());
+            }
+
+            // Agregar estrategias evolucionadas al mapa
+            for strategy in &evolved_strategies {
+                all_strategies_map.insert(strategy.name.clone(), strategy.clone());
+            }
+
+            // Backtestear estrategias evolucionadas
+            if config.verbose {
+                println!("   🔄 Backtesteando estrategias evolucionadas...");
+            }
+
+            let evolved_results = match engine.run_massive_backtest(evolved_strategies.clone(), candles.clone(), &backtest_config).await {
+                Ok(results) => {
+                    if config.verbose {
+                        println!("   ✅ {} estrategias evolucionadas backtesteadas", results.len());
+                    }
+                    results
+                }
+                Err(e) => {
+                    eprintln!("   ⚠️  Error al backtestear estrategias evolucionadas: {}", e);
+                    Vec::new()
+                }
+            };
+
+            // Combinar resultados originales y evolucionados
+            all_results.extend(evolved_results);
+
+            if config.verbose {
+                println!("   ✅ Total estrategias (originales + evolucionadas): {}\n", all_results.len());
+            }
+        }
+    }
+
+    // ==========================================
+    // FASE 7: Re-filtrar y Re-ranquear (si hubo evolución)
+    // ==========================================
+    let final_top_strategies = if config.evolve.is_some() {
+        if config.verbose {
+            println!("🏆 FASE 7: Re-filtrando y re-ranqueando todas las estrategias...");
+        }
+
+        // Re-filtrar
+        let re_filtered: Vec<&BacktestResult> = all_results
+            .iter()
+            .filter(|r| {
+                let m = &r.metrics;
+                m.total_trades >= config.min_trades &&
+                m.win_rate >= config.min_win_rate &&
+                m.sharpe_ratio >= config.min_sharpe &&
+                m.total_return >= config.min_return &&
+                m.max_drawdown <= config.max_drawdown
+            })
+            .collect();
+
+        // Re-ranquear
+        let mut re_ranked: Vec<(f64, &BacktestResult)> = re_filtered
+            .iter()
+            .map(|r| {
+                let m = &r.metrics;
+                let weights = &config.score_weights;
+                
+                // Normalizar métricas
+                let sharpe_norm = (m.sharpe_ratio + 2.0) / 4.0;
+                let sortino_norm = (m.sortino_ratio + 2.0) / 4.0;
+                let pf_norm = (m.profit_factor.min(5.0)) / 5.0;
+                let return_norm = (m.total_return + 1.0) / 2.0;
+                let dd_norm = 1.0 - m.max_drawdown_percent.min(1.0);
+                
+                let score = weights[0] * sharpe_norm +
+                    weights[1] * sortino_norm +
+                    weights[2] * pf_norm +
+                    weights[3] * return_norm +
+                    weights[4] * dd_norm;
+                
+                (score, *r)
+            })
+            .collect();
+
+        re_ranked.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        
+        let final_top: Vec<&BacktestResult> = re_ranked
+            .iter()
+            .take(config.top)
+            .map(|(_, r)| *r)
+            .collect();
+
+        if config.verbose {
+            println!("   ✅ Top {} estrategias finales seleccionadas\n", final_top.len());
+        }
+
+        final_top
+    } else {
+        top_strategies
+    };
+
+    // ==========================================
+    // FASE 8: Mostrar Resultados
     // ==========================================
     if config.verbose {
         println!("📈 FASE 6: Top {} Estrategias", config.show_top);
         println!("{}", "=".repeat(100));
     }
     
-    for (i, result) in top_strategies.iter().take(config.show_top).enumerate() {
+    for (i, result) in final_top_strategies.iter().take(config.show_top).enumerate() {
         let m = &result.metrics;
         if config.verbose {
             println!("\n{}. {}", i + 1, result.strategy_name);
             println!("   📊 Métricas:");
             println!("      Total Return:     {:.2}%", m.total_return * 100.0);
+            println!("      ROI sobre Capital Arriesgado: {:.2}%", m.return_on_risk * 100.0);
             println!("      Sharpe Ratio:     {:.3}", m.sharpe_ratio);
             println!("      Sortino Ratio:    {:.3}", m.sortino_ratio);
             println!("      Profit Factor:   {:.3}", m.profit_factor);
@@ -455,17 +709,232 @@ async fn main() -> anyhow::Result<()> {
     
     println!("\n📊 Resumen Final:");
     println!("   Total generadas:        {}", config.strategies);
-    println!("   Backtesteadas:         {}", results.len());
-    println!("   Pasaron filtros:       {}", filtered.len());
-    println!("   Top {} seleccionadas: {}", config.top, top_strategies.len());
+    if config.evolve.is_some() {
+        println!("   Evolucionadas:          {} generaciones", config.evolve.unwrap());
+        println!("   Total backtesteadas:    {} (originales + evolucionadas)", all_results.len());
+    } else {
+        println!("   Backtesteadas:         {}", all_results.len());
+    }
+    let filtered_count_str = if config.evolve.is_some() { 
+        "ver FASE 7".to_string() 
+    } else { 
+        format!("{}", filtered.len()) 
+    };
+    println!("   Pasaron filtros:       {}", filtered_count_str);
+    println!("   Top {} seleccionadas: {}", config.top, final_top_strategies.len());
 
     // ==========================================
-    // FASE 7: Guardar Resultados (opcional)
+    // FASE 7: Guardar en SQLite (persistencia principal)
+    // ==========================================
+    if !config.no_db {
+        if config.verbose {
+            println!("\n💾 FASE 7: Guardando mejores estrategias en SQLite...");
+        }
+
+        // Inicializar base de datos
+        let pool = match init_sqlite(&config.db_path).await {
+            Ok(pool) => {
+                if config.verbose {
+                    println!("   ✅ Base de datos conectada: {}", config.db_path);
+                }
+                pool
+            }
+            Err(e) => {
+                eprintln!("   ❌ Error al conectar a SQLite: {}", e);
+                eprintln!("   💡 Continuando sin guardar en base de datos...");
+                return if config.output.is_some() {
+                    // Continuar para guardar JSON si está especificado
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!("No se pudo guardar en SQLite y no se especificó --output"))
+                };
+            }
+        };
+
+        let strategy_repo = StrategyRepository::new(pool.clone());
+        let backtest_repo = BacktestRepository::new(pool);
+
+        // Preparar metadata de ejecución
+        let execution_metadata = serde_json::json!({
+            "data_file": config.data,
+            "start_date": config.start_date,
+            "end_date": config.end_date,
+            "strategies_generated": config.strategies,
+            "top_n": config.top,
+            "filters": {
+                "min_trades": config.min_trades,
+                "min_win_rate": config.min_win_rate,
+                "min_sharpe": config.min_sharpe,
+                "min_return": config.min_return,
+                "max_drawdown": config.max_drawdown,
+            },
+            "score_weights": weights,
+            "backtest_config": {
+                "initial_balance": config.initial_balance,
+                "commission_rate": config.commission_rate,
+                "slippage_bps": config.slippage_bps,
+                "risk_per_trade": config.risk_per_trade,
+                "stop_loss": config.stop_loss,
+                "take_profit": config.take_profit,
+            },
+            "executed_at": chrono::Utc::now().to_rfc3339(),
+        });
+
+        // Guardar cada estrategia top
+        let mut saved_strategy_ids = Vec::new();
+        let mut saved_count = 0;
+        let mut updated_count = 0;
+
+        for (_i, result) in final_top_strategies.iter().enumerate() {
+                if let Some(strategy_ast) = all_strategies_map.get(&result.strategy_name) {
+                // Convertir AST a modelo
+                let strategy_model = strategy_ast_to_model(
+                    strategy_ast,
+                    Some(&result.metrics),
+                    Some(execution_metadata.clone()),
+                );
+
+                // Guardar o actualizar estrategia
+                match strategy_repo.create_or_update_best(&strategy_model).await {
+                    Ok(strategy_id) => {
+                        saved_strategy_ids.push(strategy_id);
+                        
+                        // Verificar si fue nueva o actualizada
+                        if let Some(existing) = strategy_repo.find_by_hash(
+                            &strategy_model.strategy_hash.as_ref().unwrap()
+                        ).await? {
+                            if existing.id == Some(strategy_id) {
+                                saved_count += 1;
+                            } else {
+                                updated_count += 1;
+                            }
+                        } else {
+                            saved_count += 1;
+                        }
+
+                        // Guardar resultado de backtest extendido
+                        let start_date_str = config.start_date.as_ref()
+                            .map(|d| d.clone())
+                            .unwrap_or_else(|| "N/A".to_string());
+                        let end_date_str = config.end_date.as_ref()
+                            .map(|d| d.clone())
+                            .unwrap_or_else(|| "N/A".to_string());
+                        
+                        // Extraer timeframe del nombre del archivo o usar "unknown"
+                        let timeframe = if config.data.contains("_1h") {
+                            "1h"
+                        } else if config.data.contains("_4h") {
+                            "4h"
+                        } else if config.data.contains("_1d") {
+                            "1d"
+                        } else {
+                            "unknown"
+                        };
+
+                        // Calcular score para este resultado
+                        let m = &result.metrics;
+                        let weights = &config.score_weights;
+                        let sharpe_norm = (m.sharpe_ratio + 2.0) / 4.0;
+                        let sortino_norm = (m.sortino_ratio + 2.0) / 4.0;
+                        let pf_norm = (m.profit_factor.min(5.0)) / 5.0;
+                        let return_norm = (m.total_return + 1.0) / 2.0;
+                        let dd_norm = 1.0 - m.max_drawdown_percent.min(1.0);
+                        let composite_score = weights[0] * sharpe_norm +
+                            weights[1] * sortino_norm +
+                            weights[2] * pf_norm +
+                            weights[3] * return_norm +
+                            weights[4] * dd_norm;
+
+                        let backtest_result = darwinx_store::BacktestResult {
+                            id: None,
+                            strategy_id,
+                            dataset: config.data.clone(),
+                            timeframe: timeframe.to_string(),
+                            start_date: start_date_str,
+                            end_date: end_date_str,
+                            total_return: result.metrics.total_return,
+                            sharpe_ratio: result.metrics.sharpe_ratio,
+                            sortino_ratio: Some(result.metrics.sortino_ratio),
+                            max_drawdown: result.metrics.max_drawdown,
+                            win_rate: result.metrics.win_rate,
+                            profit_factor: Some(result.metrics.profit_factor),
+                            total_trades: result.trades.len() as i32,
+                            tested_at: Some(chrono::Utc::now().to_rfc3339()),
+                            annualized_return: Some(result.metrics.annualized_return),
+                            max_drawdown_percent: Some(result.metrics.max_drawdown_percent),
+                            total_profit: Some(result.metrics.total_profit),
+                            total_loss: Some(result.metrics.total_loss),
+                            max_consecutive_wins: Some(result.metrics.max_consecutive_wins as i32),
+                            max_consecutive_losses: Some(result.metrics.max_consecutive_losses as i32),
+                            trades_per_month: Some(result.metrics.trades_per_month),
+                            trades_per_year: Some(result.metrics.trades_per_year),
+                            stop_loss_exits: Some(result.metrics.stop_loss_exits as i32),
+                            take_profit_exits: Some(result.metrics.take_profit_exits as i32),
+                            signal_exits: Some(result.metrics.signal_exits as i32),
+                            end_of_data_exits: Some(result.metrics.end_of_data_exits as i32),
+                            composite_score: Some(composite_score),
+                        };
+
+                        match backtest_repo.create_or_update_extended(&backtest_result).await {
+                            Ok(_) => {
+                                // Silenciosamente actualizado o creado
+                            }
+                            Err(e) => {
+                                eprintln!("   ⚠️  Error al guardar backtest result para {}: {}", result.strategy_name, e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("   ⚠️  Error al guardar estrategia {}: {}", result.strategy_name, e);
+                    }
+                }
+            }
+        }
+
+        // Marcar todas las guardadas como mejores
+        if !saved_strategy_ids.is_empty() {
+            if let Err(e) = strategy_repo.mark_as_best(&saved_strategy_ids).await {
+                eprintln!("   ⚠️  Error al marcar estrategias como mejores: {}", e);
+            }
+        }
+
+        if config.verbose {
+            println!("   ✅ Guardadas {} estrategias nuevas", saved_count);
+            if updated_count > 0 {
+                println!("   ✅ Actualizadas {} estrategias existentes", updated_count);
+            }
+            println!("   ✅ Total {} estrategias marcadas como mejores", saved_strategy_ids.len());
+            println!("   📊 Base de datos: {}", config.db_path);
+        } else {
+            println!("\n💾 Guardadas {} estrategias en SQLite: {}", saved_strategy_ids.len(), config.db_path);
+        }
+    } else if config.verbose {
+        println!("\n⏭️  Saltando guardado en SQLite (--no-db especificado)");
+    }
+
+    // ==========================================
+    // FASE 8: Guardar Resultados JSON (opcional, solo para consulta rápida)
     // ==========================================
     if let Some(output_path) = &config.output {
         if config.verbose {
             println!("\n💾 Guardando resultados en {}...", output_path);
         }
+        
+        // Determinar timeframe del dataset para corregir el AST en el JSON
+        use darwinx_core::TimeFrame;
+        let dataset_timeframe = if config.data.contains("_1h") {
+            TimeFrame::H1
+        } else if config.data.contains("_4h") {
+            TimeFrame::H4
+        } else if config.data.contains("_1d") {
+            TimeFrame::D1
+        } else if config.data.contains("_15m") {
+            TimeFrame::M15
+        } else if config.data.contains("_30m") {
+            TimeFrame::M30
+        } else {
+            TimeFrame::H1 // Default
+        };
         
         // Crear estructura serializable con resultados y scores
         let output_data = serde_json::json!({
@@ -485,19 +954,41 @@ async fn main() -> anyhow::Result<()> {
             "summary": {
                 "total_backtested": results.len(),
                 "passed_filters": filtered.len(),
-                "top_selected": top_strategies.len(),
+                "top_selected": final_top_strategies.len(),
             },
-            "top_strategies": top_strategies.iter().enumerate().map(|(i, r)| {
-                let score = ranked[i].0;
+            "top_strategies": final_top_strategies.iter().enumerate().map(|(i, r)| {
                 // Obtener la definición completa de la estrategia (AST)
-                let strategy_ast = strategies_map.get(&r.strategy_name);
+                let mut strategy_ast = all_strategies_map.get(&r.strategy_name).cloned();
+                
+                // CORRECCIÓN: Sobrescribir el timeframe de la estrategia con el del dataset
+                if let Some(ref mut ast) = strategy_ast {
+                    ast.timeframe = dataset_timeframe;
+                }
+                
+                // Calcular score
+                let m = &r.metrics;
+                let weights = &config.score_weights;
+                let sharpe_norm = (m.sharpe_ratio + 2.0) / 4.0;
+                let sortino_norm = (m.sortino_ratio + 2.0) / 4.0;
+                let pf_norm = (m.profit_factor.min(5.0)) / 5.0;
+                let return_norm = (m.total_return + 1.0) / 2.0;
+                let dd_norm = 1.0 - m.max_drawdown_percent.min(1.0);
+                let score = weights[0] * sharpe_norm +
+                    weights[1] * sortino_norm +
+                    weights[2] * pf_norm +
+                    weights[3] * return_norm +
+                    weights[4] * dd_norm;
+                
+                // Solo guardar métricas esenciales, NO trades ni equity_curve para reducir tamaño
                 serde_json::json!({
                     "rank": i + 1,
                     "score": score,
                     "strategy_name": r.strategy_name,
-                    "strategy": strategy_ast, // AST completo de la estrategia
-                    "metrics": r.metrics,
+                    "strategy": strategy_ast, // AST necesario para reproducir la estrategia
+                    "metrics": r.metrics,     // Solo métricas, NO incluye trades ni equity_curve
                     "total_trades": r.trades.len(),
+                    // NOTA: trades y equity_curve no se guardan en JSON para reducir tamaño
+                    // Los trades completos están disponibles en SQLite si se necesitan
                 })
             }).collect::<Vec<_>>(),
         });
@@ -512,9 +1003,10 @@ async fn main() -> anyhow::Result<()> {
         file.write_all(json.as_bytes())?;
         
         if config.verbose {
-            println!("   ✅ Resultados guardados en {}", output_path);
+            println!("   ✅ Resultados JSON guardados en {} (solo para consulta rápida)", output_path);
+            println!("   💡 Nota: SQLite es la persistencia principal. JSON es opcional.");
         } else {
-            println!("💾 Resultados guardados en {}", output_path);
+            println!("💾 Resultados JSON guardados en {} (consulta rápida)", output_path);
         }
     }
 

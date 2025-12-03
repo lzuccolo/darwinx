@@ -331,6 +331,17 @@ impl PolarsBacktestEngine {
         // Returns
         let total_return = calculate_total_return(initial_balance, final_balance);
         
+        // Calcular ROI sobre capital arriesgado
+        let total_pnl = final_balance - initial_balance;
+        let total_capital_risked: f64 = trades.iter()
+            .map(|t| t.entry_price * t.size)
+            .sum();
+        let return_on_risk = if total_capital_risked > 0.0 {
+            total_pnl / total_capital_risked
+        } else {
+            0.0
+        };
+        
         // Calcular días (aproximado desde timestamps)
         let days = if !equity_curve.is_empty() {
             let duration_ms = equity_curve.last().unwrap().timestamp - equity_curve[0].timestamp;
@@ -403,6 +414,7 @@ impl PolarsBacktestEngine {
             annualized_return,
             sharpe_ratio,
             sortino_ratio,
+            return_on_risk,
             max_drawdown,
             max_drawdown_duration,
             calmar_ratio,

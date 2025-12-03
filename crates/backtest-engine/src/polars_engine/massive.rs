@@ -719,6 +719,7 @@ impl PolarsVectorizedBacktestEngine {
         let mut in_position = false;
         let mut entry_price = 0.0;
         let mut entry_timestamp = 0i64;
+        let mut entry_size = 0.0; // Guardar el tamaño de la posición al abrir
         let mut balance = config.initial_balance;
 
         for i in 0..df.height() {
@@ -734,10 +735,29 @@ impl PolarsVectorizedBacktestEngine {
                 let slippage = config.calculate_slippage(close);
                 entry_price = close + slippage;
                 entry_timestamp = timestamp;
-                let size = (balance * config.risk_per_trade) / entry_price;
-                let commission = config.calculate_commission(entry_price * size);
                 
-                if balance >= (entry_price * size + commission) {
+                // Position sizing: si hay stop loss, calcular basado en riesgo máximo
+                // Si no hay stop loss, usar más capital para mejor PnL (50% del balance disponible)
+                entry_size = if let Some(sl_percent) = config.stop_loss_percent {
+                    // Position sizing basado en riesgo: riesgo_máximo / pérdida_por_unidad
+                    // Esto permite usar más capital cuando el SL es cercano, manteniendo el riesgo constante
+                    let max_risk_amount = balance * config.risk_per_trade;
+                    let risk_per_unit = entry_price * sl_percent;
+                    if risk_per_unit > 0.0 {
+                        max_risk_amount / risk_per_unit
+                    } else {
+                        // Fallback si sl_percent es 0
+                        (balance * 0.5) / entry_price
+                    }
+                } else {
+                    // Sin stop loss: usar 50% del balance disponible para mejor PnL
+                    // El PnL se calculará sobre este capital invertido
+                    (balance * 0.5) / entry_price
+                };
+                
+                let commission = config.calculate_commission(entry_price * entry_size);
+                
+                if balance >= (entry_price * entry_size + commission) {
                     balance -= commission;
                     in_position = true;
                 }
@@ -779,12 +799,12 @@ impl PolarsVectorizedBacktestEngine {
 
                 // Cerrar posición si es necesario
                 if should_exit {
-                    let size = (balance * config.risk_per_trade) / entry_price;
-                    let trade_value = exit_price * size;
+                    // Usar el tamaño guardado al abrir la posición, no recalcularlo
+                    let trade_value = exit_price * entry_size;
                     let commission = config.calculate_commission(trade_value);
-                    let pnl = (exit_price - entry_price) * size - commission;
+                    let pnl = (exit_price - entry_price) * entry_size - commission;
                     let slippage = if exit_reason == "Signal" {
-                        config.calculate_slippage(close) * size
+                        config.calculate_slippage(close) * entry_size
                     } else {
                         0.0 // SL/TP se ejecutan al precio exacto (sin slippage adicional)
                     };
@@ -794,7 +814,7 @@ impl PolarsVectorizedBacktestEngine {
                         exit_timestamp: timestamp,
                         entry_price,
                         exit_price,
-                        size,
+                        size: entry_size,
                         is_long: true,
                         pnl,
                         commission,
@@ -817,21 +837,21 @@ impl PolarsVectorizedBacktestEngine {
             
             let slippage = config.calculate_slippage(last_close);
             let exit_price = last_close - slippage;
-            let size = (balance * config.risk_per_trade) / entry_price;
-            let trade_value = exit_price * size;
+            // Usar el tamaño guardado al abrir la posición, no recalcularlo
+            let trade_value = exit_price * entry_size;
             let commission = config.calculate_commission(trade_value);
-            let pnl = (exit_price - entry_price) * size - commission;
+            let pnl = (exit_price - entry_price) * entry_size - commission;
 
             trades.push(Trade {
                 entry_timestamp,
                 exit_timestamp: last_timestamp,
                 entry_price,
                 exit_price,
-                size,
+                size: entry_size,
                 is_long: true,
                 pnl,
                 commission,
-                slippage: slippage * size,
+                slippage: slippage * entry_size,
                 exit_reason: "End of data".to_string(),
             });
         }
@@ -866,6 +886,16 @@ impl PolarsVectorizedBacktestEngine {
         // Calcular returns
         let total_pnl: f64 = trades.iter().map(|t| t.pnl).sum();
         let total_return = total_pnl / config.initial_balance;
+
+        // Calcular ROI sobre capital arriesgado
+        let total_capital_risked: f64 = trades.iter()
+            .map(|t| t.entry_price * t.size)
+            .sum();
+        let return_on_risk = if total_capital_risked > 0.0 {
+            total_pnl / total_capital_risked
+        } else {
+            0.0
+        };
 
         // Calcular equity curve para métricas de riesgo
         let mut balance = config.initial_balance;
@@ -939,6 +969,7 @@ impl PolarsVectorizedBacktestEngine {
             annualized_return,
             sharpe_ratio,
             sortino_ratio,
+            return_on_risk,
             max_drawdown,
             max_drawdown_duration,
             calmar_ratio,

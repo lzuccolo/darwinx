@@ -17,6 +17,11 @@ pub struct Strategy {
     pub max_drawdown: Option<f64>,
     pub complexity_score: Option<f64>,
     pub created_at: Option<String>,
+    // New fields for best strategies
+    pub strategy_ast_json: Option<String>, // Full AST serialized as JSON
+    pub is_best: Option<i32>, // 1 if best, 0 otherwise
+    pub execution_metadata: Option<String>, // JSON with dataset, config, etc.
+    pub strategy_hash: Option<String>, // Hash for deduplication
 }
 
 impl Strategy {
@@ -33,6 +38,10 @@ impl Strategy {
             max_drawdown: None,
             complexity_score: None,
             created_at: None,
+            strategy_ast_json: None,
+            is_best: Some(0),
+            execution_metadata: None,
+            strategy_hash: None,
         }
     }
 }

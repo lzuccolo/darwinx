@@ -130,8 +130,16 @@ impl GeneticGenerator {
     // Nueva estrategia (hijo) que combina características de ambos padres
     pub fn crossover(&self, parent1: &StrategyAST, parent2: &StrategyAST) -> StrategyAST {
         let mut rng = rand::thread_rng();
+        
+        // Generar nombre corto usando hash de los padres para evitar nombres exponencialmente largos
+        let name_hash = format!("{:x}", 
+            (parent1.name.len() as u64).wrapping_mul(31) 
+            ^ (parent2.name.len() as u64).wrapping_mul(17)
+        );
+        let short_name = format!("Evolved_{}", &name_hash[..8.min(name_hash.len())]);
+        
         let mut child = StrategyAST::new(
-            format!("{}_{}", parent1.name, parent2.name),
+            short_name,
             parent1.timeframe,
         );
 
@@ -399,6 +407,7 @@ impl GeneticGenerator {
             }
 
             // Generar resto de la población
+            let mut child_counter = 0;
             while new_population.len() < self.config.population_size {
                 // Selección de padres
                 let parent1 = self.tournament_selection(&population, &fitness_fn);
@@ -406,6 +415,10 @@ impl GeneticGenerator {
 
                 // Crossover
                 let mut child = self.crossover(&parent1, &parent2);
+                
+                // Actualizar nombre con generación y contador para mejor trazabilidad
+                child.name = format!("Evolved_G{}_C{:04}", generation + 1, child_counter);
+                child_counter += 1;
 
                 // Mutación
                 self.mutate(&mut child);

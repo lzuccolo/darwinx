@@ -263,11 +263,68 @@ let result = pipeline.run(
 ).await?;
 ```
 
-## 📝 Próximos Pasos
+## 🧬 Evolución Genética (Implementado)
 
-1. **Implementar PolarsVectorizedBacktestEngine** (crítico)
-2. **Crear StrategyRanker** (alta prioridad)
-3. **Crear MassiveBacktestPipeline** (orquestación)
-4. **Tests de performance** (validar throughput)
-5. **Documentación y ejemplos**
+El pipeline ahora incluye evolución genética opcional después del backtest inicial:
+
+### Flujo con Evolución
+
+```
+FASE 1-5: Generación y Backtest Inicial
+    ↓
+FASE 6: Evolución Genética (opcional con --evolve)
+    ├─ Selecciona top estrategias del backtest inicial
+    ├─ Crea función de fitness basada en métricas
+    ├─ Evoluciona estrategias (crossover + mutación)
+    └─ Backtestea estrategias evolucionadas
+    ↓
+FASE 7: Re-filtrado y Re-ranqueo
+    ├─ Combina resultados originales + evolucionados
+    ├─ Re-filtra y re-ranquea todas las estrategias
+    └─ Selecciona mejores finales
+    ↓
+FASE 8: Guardado en SQLite
+```
+
+### Función de Fitness
+
+La función de fitness combina múltiples métricas normalizadas:
+
+```rust
+fitness = w1 * Sharpe_norm + 
+          w2 * Sortino_norm + 
+          w3 * ProfitFactor_norm + 
+          w4 * Return_norm + 
+          w5 * (1 - Drawdown_norm)
+```
+
+### Configuración
+
+- `--evolve N`: Número de generaciones
+- `--evolve-population SIZE`: Tamaño de población (default: 100)
+- `--evolve-mutation-rate RATE`: Tasa de mutación (default: 0.1)
+- `--evolve-elite-size SIZE`: Tamaño de elite (default: 10)
+
+### Retroalimentación con SQLite
+
+- `--load-best N`: Carga N mejores estrategias históricas como población inicial
+- Las estrategias evolucionadas se guardan en SQLite para futuras ejecuciones
+- Sistema de deduplicación evita guardar estrategias idénticas
+
+## 📝 Estado de Implementación
+
+1. ✅ **PolarsVectorizedBacktestEngine** - IMPLEMENTADO
+2. ✅ **StrategyRanker** - IMPLEMENTADO (integrado en CLI)
+3. ✅ **MassiveBacktestPipeline** - IMPLEMENTADO (CLI `massive_backtest`)
+4. ✅ **Evolución Genética** - IMPLEMENTADO
+5. ✅ **Persistencia SQLite** - IMPLEMENTADO
+6. ⏳ **Tests de performance** - Pendiente
+7. ✅ **Documentación básica** - COMPLETADO
+
+## 🚀 Próximos Pasos
+
+1. **Tests de performance** (validar throughput)
+2. **Optimización de batch processing** para 100K+ estrategias
+3. **Event-Driven backtest detallado** para top estrategias (opcional)
+4. **Análisis de correlación** entre estrategias
 

@@ -26,6 +26,8 @@ pub struct BacktestMetrics {
     pub annualized_return: f64,
     pub sharpe_ratio: f64,
     pub sortino_ratio: f64,
+    /// Retorno sobre el capital total arriesgado (total_pnl / total_capital_risked)
+    pub return_on_risk: f64,
 
     // Risk
     pub max_drawdown: f64,
@@ -96,6 +98,7 @@ impl Default for BacktestMetrics {
             annualized_return: 0.0,
             sharpe_ratio: 0.0,
             sortino_ratio: 0.0,
+            return_on_risk: 0.0,
             max_drawdown: 0.0,
             max_drawdown_duration: 0,
             calmar_ratio: 0.0,
