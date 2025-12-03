@@ -1018,4 +1018,3 @@ impl Default for PolarsVectorizedBacktestEngine {
         Self::new()
     }
 }
-
