@@ -89,6 +89,8 @@ pub struct BacktestMetrics {
     pub signal_exits: usize,
     /// Número de trades cerrados al final de datos
     pub end_of_data_exits: usize,
+    /// Número de señales de entrada generadas (para diagnóstico)
+    pub entry_signals_count: usize,
 }
 
 impl Default for BacktestMetrics {
@@ -128,6 +130,7 @@ impl Default for BacktestMetrics {
             take_profit_exits: 0,
             signal_exits: 0,
             end_of_data_exits: 0,
+            entry_signals_count: 0,
         }
     }
 }

@@ -173,7 +173,9 @@ impl PolarsVectorizedBacktestEngine {
         let trades = self.calculate_trades_from_signals(&df_with_signals, config)?;
 
         // Calcular métricas
-        let metrics = self.calculate_metrics_from_trades(&trades, config)?;
+        let mut metrics = self.calculate_metrics_from_trades(&trades, config)?;
+        // Guardar entry_signals_count para diagnóstico
+        metrics.entry_signals_count = true_signals;
 
         // Obtener metadata desde DataFrame
         let timestamp_col = df.column("timestamp")
@@ -256,22 +258,42 @@ impl PolarsVectorizedBacktestEngine {
             ConditionValue::Indicator(ind) => self.indicator_to_polars_expr(ind, df)?,
         };
 
-        // Aplicar comparación
+        // Aplicar comparación con manejo de NaN
+        // Polars: NaN comparado con cualquier valor resulta en null, que se convierte en false
+        // Necesitamos filtrar NaN antes de comparar para que las condiciones se evalúen correctamente
+        // IMPORTANTE: También necesitamos verificar que compare_value no sea null/NaN
         let comparison_expr = match condition.comparison {
-            Comparison::GreaterThan => indicator_expr.gt(compare_value),
-            Comparison::LessThan => indicator_expr.lt(compare_value),
-            Comparison::Equals => indicator_expr.eq(compare_value),
+            Comparison::GreaterThan => {
+                // Solo evaluar si ambos valores son válidos (no null/NaN)
+                indicator_expr.clone()
+                    .is_not_null()
+                    .and(compare_value.clone().is_not_null())
+                    .and(indicator_expr.gt(compare_value))
+            }
+            Comparison::LessThan => {
+                indicator_expr.clone()
+                    .is_not_null()
+                    .and(compare_value.clone().is_not_null())
+                    .and(indicator_expr.lt(compare_value))
+            }
+            Comparison::Equals => {
+                indicator_expr.clone()
+                    .is_not_null()
+                    .and(compare_value.clone().is_not_null())
+                    .and(indicator_expr.eq(compare_value))
+            }
             Comparison::CrossesAbove => {
-                // Crosses above: indicador > valor AND indicador anterior <= valor anterior
-                // TODO: Implementar shift() correctamente con Polars
-                // Por ahora, simplificar a comparación directa
-                indicator_expr.gt(compare_value)
+                // Simplificado: solo comparación directa con filtro de NaN
+                indicator_expr.clone()
+                    .is_not_null()
+                    .and(compare_value.clone().is_not_null())
+                    .and(indicator_expr.gt(compare_value))
             }
             Comparison::CrossesBelow => {
-                // Crosses below: indicador < valor AND indicador anterior >= valor anterior
-                // TODO: Implementar shift() correctamente con Polars
-                // Por ahora, simplificar a comparación directa
-                indicator_expr.lt(compare_value)
+                indicator_expr.clone()
+                    .is_not_null()
+                    .and(compare_value.clone().is_not_null())
+                    .and(indicator_expr.lt(compare_value))
             }
         };
 
@@ -740,47 +762,28 @@ impl PolarsVectorizedBacktestEngine {
         let mut entry_timestamp = 0i64;
         let mut entry_size = 0.0; // Guardar el tamaño de la posición al abrir
         let mut balance = config.initial_balance;
+        
 
+        // Convertir las señales booleanas a vectores para acceso eficiente
+        // Esto evita problemas con ChunkedArray::get() vs iter()
+        let entry_signals_vec: Vec<bool> = entry_signals.iter().map(|opt| opt.unwrap_or(false)).collect();
+        let exit_signals_vec: Vec<bool> = exit_signals.iter().map(|opt| opt.unwrap_or(false)).collect();
+        let closes_vec: Vec<f64> = closes.iter().map(|opt| opt.unwrap_or(0.0)).collect();
+        let highs_vec: Vec<f64> = highs.iter().map(|opt| opt.unwrap_or(0.0)).collect();
+        let lows_vec: Vec<f64> = lows.iter().map(|opt| opt.unwrap_or(0.0)).collect();
+        let timestamps_vec: Vec<i64> = timestamps.iter().map(|opt| opt.unwrap_or(0)).collect();
+        
         for i in 0..df.height() {
-            let entry_signal = entry_signals.get(i).unwrap_or(false);
-            let exit_signal = exit_signals.get(i).unwrap_or(false);
-            let close = closes.get(i).ok_or_else(|| BacktestError::DataError(anyhow::anyhow!("Missing close at index {}", i)))?;
-            let high = highs.get(i).ok_or_else(|| BacktestError::DataError(anyhow::anyhow!("Missing high at index {}", i)))?;
-            let low = lows.get(i).ok_or_else(|| BacktestError::DataError(anyhow::anyhow!("Missing low at index {}", i)))?;
-            let timestamp = timestamps.get(i).ok_or_else(|| BacktestError::DataError(anyhow::anyhow!("Missing timestamp at index {}", i)))?;
+            let entry_signal = entry_signals_vec[i];
+            let exit_signal = exit_signals_vec[i];
+            let close = closes_vec[i];
+            let high = highs_vec[i];
+            let low = lows_vec[i];
+            let timestamp = timestamps_vec[i];
 
-            if !in_position && entry_signal {
-                // Entrar en posición long
-                let slippage = config.calculate_slippage(close);
-                entry_price = close + slippage;
-                entry_timestamp = timestamp;
-                
-                // Position sizing: si hay stop loss, calcular basado en riesgo máximo
-                // Si no hay stop loss, usar más capital para mejor PnL (50% del balance disponible)
-                entry_size = if let Some(sl_percent) = config.stop_loss_percent {
-                    // Position sizing basado en riesgo: riesgo_máximo / pérdida_por_unidad
-                    // Esto permite usar más capital cuando el SL es cercano, manteniendo el riesgo constante
-                    let max_risk_amount = balance * config.risk_per_trade;
-                    let risk_per_unit = entry_price * sl_percent;
-                    if risk_per_unit > 0.0 {
-                        max_risk_amount / risk_per_unit
-                    } else {
-                        // Fallback si sl_percent es 0
-                        (balance * 0.5) / entry_price
-                    }
-                } else {
-                    // Sin stop loss: usar 50% del balance disponible para mejor PnL
-                    // El PnL se calculará sobre este capital invertido
-                    (balance * 0.5) / entry_price
-                };
-                
-                let commission = config.calculate_commission(entry_price * entry_size);
-                
-                if balance >= (entry_price * entry_size + commission) {
-                    balance -= commission;
-                    in_position = true;
-                }
-            } else if in_position {
+            // IMPORTANTE: Primero verificar si debemos salir (si estamos en posición)
+            // Esto permite salir y entrar en la misma vela si es necesario
+            if in_position {
                 // Verificar stop loss y take profit primero (tienen prioridad)
                 let mut should_exit = false;
                 let mut exit_reason = String::new();
@@ -845,6 +848,43 @@ impl PolarsVectorizedBacktestEngine {
                     in_position = false;
                 }
             }
+            
+            // Después de verificar salida, verificar entrada (si no estamos en posición)
+            if !in_position && entry_signal {
+                // Entrar en posición long
+                let slippage = config.calculate_slippage(close);
+                entry_price = close + slippage;
+                entry_timestamp = timestamp;
+                
+                // Position sizing: calcular basado en riesgo, pero limitado por balance disponible
+                // Máximo 50% del balance para cada posición (para dejar margen para comisiones y variación)
+                let max_position_value = balance * 0.5;
+                let max_size_by_balance = max_position_value / entry_price;
+                
+                entry_size = if let Some(sl_percent) = config.stop_loss_percent {
+                    // Position sizing basado en riesgo: riesgo_máximo / pérdida_por_unidad
+                    let max_risk_amount = balance * config.risk_per_trade;
+                    let risk_per_unit = entry_price * sl_percent;
+                    let size_by_risk = if risk_per_unit > 0.0 {
+                        max_risk_amount / risk_per_unit
+                    } else {
+                        max_size_by_balance
+                    };
+                    // Usar el menor entre el tamaño por riesgo y el tamaño máximo por balance
+                    size_by_risk.min(max_size_by_balance)
+                } else {
+                    // Sin stop loss: usar el máximo por balance
+                    max_size_by_balance
+                };
+                
+                let commission = config.calculate_commission(entry_price * entry_size);
+                let required_balance = entry_price * entry_size + commission;
+                
+                if balance >= required_balance {
+                    balance -= commission;
+                    in_position = true;
+                }
+            }
         }
 
         // Cerrar posición abierta al final si existe
@@ -874,6 +914,7 @@ impl PolarsVectorizedBacktestEngine {
                 exit_reason: "End of data".to_string(),
             });
         }
+        
 
         Ok(trades)
     }
@@ -1018,6 +1059,7 @@ impl PolarsVectorizedBacktestEngine {
             take_profit_exits,
             signal_exits,
             end_of_data_exits,
+            entry_signals_count: 0, // Se establece en backtest_single_strategy
         })
     }
 }

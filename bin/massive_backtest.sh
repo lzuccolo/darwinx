@@ -18,7 +18,7 @@ START_DATE="2024-12-01"  # Ejemplo: "2024-01-01"
 END_DATE="2025-03-01"    # Ejemplo: "2024-12-31"
 
 # Número de estrategias a generar
-STRATEGIES=10000
+STRATEGIES=100000
 
 # Top N estrategias a seleccionar
 TOP=100
@@ -42,7 +42,7 @@ RISK_PER_TRADE=0.02
 STOP_LOSS="0.02"  # 2% stop loss
 
 # Take Profit como porcentaje del precio de entrada (ej: 0.05 = 5%, deja vacío para deshabilitar)
-TAKE_PROFIT="0.06"  # 6% take profit (ratio 3:1 con SL)
+TAKE_PROFIT="0.03"  # 6% take profit (ratio 3:1 con SL)
 
 # Filtros de calidad
 # NOTA: Estos filtros son más realistas para permitir que pasen estrategias viables

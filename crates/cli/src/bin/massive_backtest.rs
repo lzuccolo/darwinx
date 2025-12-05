@@ -488,6 +488,7 @@ async fn main() -> anyhow::Result<()> {
             for (i, (result, strategy_ast)) in sample_strategies.iter().enumerate() {
                 println!("      Estrategia {}: {}", i + 1, result.strategy_name);
                 println!("         - Trades generados: {}", result.metrics.total_trades);
+                println!("         - Señales de entrada generadas: {}", result.metrics.entry_signals_count);
                 
                 if let Some(ast) = strategy_ast {
                     println!("         - Entry rules: {} condiciones, operador: {:?}", 

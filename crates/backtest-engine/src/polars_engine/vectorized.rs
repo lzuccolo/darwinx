@@ -444,6 +444,7 @@ impl PolarsBacktestEngine {
             take_profit_exits,
             signal_exits,
             end_of_data_exits,
+            entry_signals_count: 0, // No disponible en este engine
         })
     }
 }
