@@ -18,13 +18,13 @@ START_DATE="2024-12-01"  # Ejemplo: "2024-01-01"
 END_DATE="2025-03-01"    # Ejemplo: "2024-12-31"
 
 # Número de estrategias a generar
-STRATEGIES=100000
+STRATEGIES=50000
 
 # Top N estrategias a seleccionar
 TOP=100
 
 # Balance inicial
-INITIAL_BALANCE=10000.0
+INITIAL_BALANCE=1000.0
 
 # Comisión por trade (como porcentaje, ej: 0.001 = 0.1%)
 COMMISSION_RATE=0.001
@@ -32,25 +32,24 @@ COMMISSION_RATE=0.001
 # Slippage en basis points (ej: 5 = 0.05%)
 SLIPPAGE_BPS=5.0
 
-# Riesgo por trade como porcentaje del balance (ej: 0.02 = 2%)
-# NOTA: Si hay stop loss, esto representa el riesgo máximo en dólares
-# Si no hay stop loss, esto es el porcentaje del balance a usar por trade
-RISK_PER_TRADE=0.02
+# Porcentaje del balance a usar por posición (ej: 0.5 = 50%, 0.95 = 95%)
+# Este es el tamaño FIJO de cada posición para comparar estrategias de forma justa
+# Tamaño = (balance * POSITION_SIZE) / max_positions
+POSITION_SIZE=0.95
 
-# Stop Loss como porcentaje del precio de entrada (ej: 0.02 = 2%, deja vacío para deshabilitar)
-# Con SL activo, el position sizing se calcula para arriesgar RISK_PER_TRADE del balance
-STOP_LOSS="0.02"  # 2% stop loss
+# Stop Loss como porcentaje del precio de entrada (ej: 0.05 = 5%, deja vacío para deshabilitar)
+STOP_LOSS=""
 
-# Take Profit como porcentaje del precio de entrada (ej: 0.05 = 5%, deja vacío para deshabilitar)
-TAKE_PROFIT="0.03"  # 6% take profit (ratio 3:1 con SL)
+# Take Profit como porcentaje del precio de entrada (ej: 0.10 = 10%, deja vacío para deshabilitar)
+TAKE_PROFIT=""
 
 # Filtros de calidad
 # NOTA: Estos filtros son más realistas para permitir que pasen estrategias viables
 # Puedes ajustarlos según tus necesidades
 MIN_TRADES=10          # Mínimo de trades para considerar la estrategia válida
-MIN_WIN_RATE=0.45      # Win rate mínimo (45% es más realista que 55%)
+MIN_WIN_RATE=0.40      # Win rate mínimo (40% - más permisivo)
 MIN_SHARPE=0.0         # Sharpe mínimo (0.0 = sin filtro de Sharpe)
-MIN_RETURN=0.05        # Retorno mínimo del 5% sobre balance inicial (más realista)
+MIN_RETURN=0.10        # Retorno mínimo del 10% sobre balance inicial
 MAX_DRAWDOWN=0.4       # Drawdown máximo del 40% (más permisivo)
 
 # Evolución Genética (deja vacío para deshabilitar)
@@ -111,7 +110,7 @@ ARGS+=("--top" "$TOP")
 ARGS+=("--initial-balance" "$INITIAL_BALANCE")
 ARGS+=("--commission-rate" "$COMMISSION_RATE")
 ARGS+=("--slippage-bps" "$SLIPPAGE_BPS")
-ARGS+=("--risk-per-trade" "$RISK_PER_TRADE")
+ARGS+=("--position-size" "$POSITION_SIZE")
 
 # Agregar stop loss si está configurado
 if [ -n "$STOP_LOSS" ]; then

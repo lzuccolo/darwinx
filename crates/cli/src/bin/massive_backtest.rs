@@ -74,6 +74,10 @@ struct Config {
     #[arg(long, default_value_t = 0.02)]
     risk_per_trade: f64,
 
+    /// Porcentaje del balance a usar por posición (ej: 0.5 = 50%, 0.95 = 95%)
+    #[arg(long, default_value_t = 0.5)]
+    position_size: f64,
+
     /// Stop loss como porcentaje del precio de entrada (ej: 0.02 = 2%, 0 = deshabilitado)
     #[arg(long)]
     stop_loss: Option<f64>,
@@ -189,7 +193,7 @@ async fn main() -> anyhow::Result<()> {
         println!("   Balance inicial:      ${:.2}", config.initial_balance);
         println!("   Comisión:            {:.4}%", config.commission_rate * 100.0);
         println!("   Slippage:            {:.2} bps", config.slippage_bps);
-        println!("   Riesgo por trade:    {:.2}%", config.risk_per_trade * 100.0);
+        println!("   Tamaño posición:     {:.0}% del balance", config.position_size * 100.0);
         if let Some(sl) = config.stop_loss {
             println!("   Stop Loss:           {:.2}%", sl * 100.0);
         }
@@ -356,7 +360,7 @@ async fn main() -> anyhow::Result<()> {
     if config.verbose {
         println!("⚙️  FASE 3: Configurando backtest...");
     }
-    let backtest_config = BacktestConfig::with_risk_management(
+    let backtest_config = BacktestConfig::with_position_size(
         config.initial_balance,
         config.commission_rate,
         config.slippage_bps,
@@ -364,6 +368,7 @@ async fn main() -> anyhow::Result<()> {
         config.risk_per_trade,
         config.stop_loss,
         config.take_profit,
+        config.position_size,
     );
     if config.verbose {
         println!("   ✅ Configuración lista\n");

@@ -856,26 +856,11 @@ impl PolarsVectorizedBacktestEngine {
                 entry_price = close + slippage;
                 entry_timestamp = timestamp;
                 
-                // Position sizing: calcular basado en riesgo, pero limitado por balance disponible
-                // Máximo 50% del balance para cada posición (para dejar margen para comisiones y variación)
-                let max_position_value = balance * 0.5;
-                let max_size_by_balance = max_position_value / entry_price;
-                
-                entry_size = if let Some(sl_percent) = config.stop_loss_percent {
-                    // Position sizing basado en riesgo: riesgo_máximo / pérdida_por_unidad
-                    let max_risk_amount = balance * config.risk_per_trade;
-                    let risk_per_unit = entry_price * sl_percent;
-                    let size_by_risk = if risk_per_unit > 0.0 {
-                        max_risk_amount / risk_per_unit
-                    } else {
-                        max_size_by_balance
-                    };
-                    // Usar el menor entre el tamaño por riesgo y el tamaño máximo por balance
-                    size_by_risk.min(max_size_by_balance)
-                } else {
-                    // Sin stop loss: usar el máximo por balance
-                    max_size_by_balance
-                };
+                // Position sizing FIJO para comparar estrategias de forma justa
+                // El tamaño es siempre el mismo: (balance * position_size_percent) / max_positions
+                let position_value = (config.initial_balance * config.position_size_percent) 
+                    / config.max_positions as f64;
+                entry_size = position_value / entry_price;
                 
                 let commission = config.calculate_commission(entry_price * entry_size);
                 let required_balance = entry_price * entry_size + commission;

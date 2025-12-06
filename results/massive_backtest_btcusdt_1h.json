@@ -3,10 +3,10 @@
     "data_file": "data/BTCUSDT_1h.parquet",
     "filters": {
       "max_drawdown": 0.4,
-      "min_return": 0.05,
+      "min_return": 0.1,
       "min_sharpe": 0.0,
       "min_trades": 10,
-      "min_win_rate": 0.45
+      "min_win_rate": 0.4
     },
     "score_weights": [
       0.3,
@@ -19,60 +19,78 @@
     "top_n": 100
   },
   "summary": {
-    "passed_filters": 2,
-    "top_selected": 2,
+    "passed_filters": 7,
+    "top_selected": 7,
     "total_backtested": 50000
   },
   "top_strategies": [
     {
       "metrics": {
-        "annualized_return": 0.2733020290364947,
-        "average_losing_trade_duration_ms": 7200000.0,
-        "average_loss": 41.07893426618146,
-        "average_trade_duration_ms": 48900000.0,
-        "average_win": 72.2143754147739,
-        "average_winning_trade_duration_ms": 62800000.0,
-        "calmar_ratio": 24.88886727291261,
+        "annualized_return": 0.6992864439197282,
+        "average_losing_trade_duration_ms": 91200000.0,
+        "average_loss": 8.410132915529616,
+        "average_trade_duration_ms": 64080000.0,
+        "average_win": 18.827835422968707,
+        "average_winning_trade_duration_ms": 52457142.85714286,
+        "calmar_ratio": 116.40186007066137,
         "end_of_data_exits": 0,
-        "entry_signals_count": 27,
-        "expectancy": 43.89104799453506,
-        "largest_loss": 85.04075198284667,
-        "largest_win": 151.21202570901156,
+        "entry_signals_count": 66,
+        "expectancy": 10.65644492141921,
+        "largest_loss": 15.248222516177666,
+        "largest_win": 39.96758274046833,
         "losing_trades": 3,
         "max_consecutive_losses": 1,
-        "max_consecutive_wins": 6,
-        "max_drawdown": 0.010980894632112827,
-        "max_drawdown_duration": 6,
-        "max_drawdown_percent": 0.010980894632112827,
-        "profit_factor": 5.27382538311552,
-        "recovery_factor": 5.918728851402452,
-        "return_on_risk": 0.008467823767006215,
-        "sharpe_ratio": 0.5165538061043804,
-        "signal_exits": 9,
-        "sortino_ratio": 1.3299895783066789,
+        "max_consecutive_wins": 4,
+        "max_drawdown": 0.006007519497499684,
+        "max_drawdown_duration": 1,
+        "max_drawdown_percent": 0.006007519497499684,
+        "profit_factor": 5.223652994330881,
+        "recovery_factor": 21.938313810822194,
+        "return_on_risk": 0.011217310443599167,
+        "sharpe_ratio": 0.846246213362321,
+        "signal_exits": 10,
+        "sortino_ratio": 5.504572466316969,
         "stop_loss_exits": 0,
-        "take_profit_exits": 3,
-        "total_loss": 123.23680279854439,
-        "total_profit": 649.9293787329651,
-        "total_return": 0.05266925759344207,
-        "total_trades": 12,
-        "trades_per_month": 4.642665233745298,
-        "trades_per_year": 56.48576034390112,
-        "var_95": 0.008010669168812925,
-        "win_rate": 0.75,
-        "winning_trades": 9
+        "take_profit_exits": 0,
+        "total_loss": 25.230398746588847,
+        "total_profit": 131.79484796078094,
+        "total_return": 0.1065644492141921,
+        "total_trades": 10,
+        "trades_per_month": 4.303646144650329,
+        "trades_per_year": 52.361028093245665,
+        "var_95": 0.006007519497499684,
+        "win_rate": 0.7,
+        "winning_trades": 7
       },
       "rank": 1,
-      "score": 0.7825440744978537,
+      "score": 1.020788295084462,
       "strategy": {
         "entry_rules": {
           "conditions": [
             {
               "comparison": "LessThan",
               "indicator": {
-                "name": "ema",
+                "name": "mfi",
                 "params": [
-                  158.0
+                  55.0
+                ]
+              },
+              "value": {
+                "Number": 29.671296211760595
+              }
+            }
+          ],
+          "operator": "And"
+        },
+        "exit_rules": {
+          "conditions": [
+            {
+              "comparison": "LessThan",
+              "indicator": {
+                "name": "bollinger_bands",
+                "params": [
+                  31.0,
+                  4.9
                 ]
               },
               "value": "Price"
@@ -80,9 +98,550 @@
             {
               "comparison": "GreaterThan",
               "indicator": {
+                "name": "macd",
+                "params": [
+                  44.0,
+                  77.0,
+                  18.0
+                ]
+              },
+              "value": {
+                "Number": 20.21235831877744
+              }
+            }
+          ],
+          "operator": "Or"
+        },
+        "name": "Strategy_15380",
+        "timeframe": "H1"
+      },
+      "strategy_name": "Strategy_15380",
+      "total_trades": 10
+    },
+    {
+      "metrics": {
+        "annualized_return": 0.5068168966842395,
+        "average_losing_trade_duration_ms": 68700000.0,
+        "average_loss": 4.223246680609683,
+        "average_trade_duration_ms": 119232000.0,
+        "average_win": 11.803282452193995,
+        "average_winning_trade_duration_ms": 165876923.07692307,
+        "calmar_ratio": 21.4549171298498,
+        "end_of_data_exits": 1,
+        "entry_signals_count": 134,
+        "expectancy": 4.11054846844823,
+        "largest_loss": 24.877541630834163,
+        "largest_win": 41.507305374882705,
+        "losing_trades": 12,
+        "max_consecutive_losses": 4,
+        "max_consecutive_wins": 5,
+        "max_drawdown": 0.023622412224520557,
+        "max_drawdown_duration": 11,
+        "max_drawdown_percent": 0.023622412224520557,
+        "profit_factor": 3.0277391519465304,
+        "recovery_factor": 6.495639413118244,
+        "return_on_risk": 0.004326893124682346,
+        "sharpe_ratio": 0.33220665904094276,
+        "signal_exits": 24,
+        "sortino_ratio": 0.8076215294334853,
+        "stop_loss_exits": 0,
+        "take_profit_exits": 0,
+        "total_loss": 50.6789601673162,
+        "total_profit": 153.44267187852194,
+        "total_return": 0.10276371171120573,
+        "total_trades": 25,
+        "trades_per_month": 8.61244019138756,
+        "trades_per_year": 104.7846889952153,
+        "var_95": 0.006149536036714135,
+        "win_rate": 0.52,
+        "winning_trades": 13
+      },
+      "rank": 2,
+      "score": 0.6655700585222686,
+      "strategy": {
+        "entry_rules": {
+          "conditions": [
+            {
+              "comparison": "LessThan",
+              "indicator": {
+                "name": "bollinger_bands",
+                "params": [
+                  47.0,
+                  4.3
+                ]
+              },
+              "value": "Price"
+            },
+            {
+              "comparison": "GreaterThan",
+              "indicator": {
+                "name": "wma",
+                "params": [
+                  96.0
+                ]
+              },
+              "value": "Price"
+            }
+          ],
+          "operator": "And"
+        },
+        "exit_rules": {
+          "conditions": [
+            {
+              "comparison": "GreaterThan",
+              "indicator": {
+                "name": "rsi",
+                "params": [
+                  82.0
+                ]
+              },
+              "value": {
+                "Number": 55.22836997073917
+              }
+            }
+          ],
+          "operator": "Or"
+        },
+        "name": "Strategy_20950",
+        "timeframe": "H1"
+      },
+      "strategy_name": "Strategy_20950",
+      "total_trades": 25
+    },
+    {
+      "metrics": {
+        "annualized_return": 0.9400680099538172,
+        "average_losing_trade_duration_ms": 71800000.0,
+        "average_loss": 10.878727040977635,
+        "average_trade_duration_ms": 41367272.72727273,
+        "average_win": 9.97245461085575,
+        "average_winning_trade_duration_ms": 26562162.162162162,
+        "calmar_ratio": 18.888557975899037,
+        "end_of_data_exits": 0,
+        "entry_signals_count": 390,
+        "expectancy": 3.1484315248011883,
+        "largest_loss": 54.49430166181294,
+        "largest_win": 32.867860806468485,
+        "losing_trades": 18,
+        "max_consecutive_losses": 4,
+        "max_consecutive_wins": 9,
+        "max_drawdown": 0.049769178311721965,
+        "max_drawdown_duration": 16,
+        "max_drawdown_percent": 0.049769178311721965,
+        "profit_factor": 1.8843137069857012,
+        "recovery_factor": 7.413841922215501,
+        "return_on_risk": 0.0033141384471591442,
+        "sharpe_ratio": 0.23900494814084106,
+        "signal_exits": 55,
+        "sortino_ratio": 0.3368533987494912,
+        "stop_loss_exits": 0,
+        "take_profit_exits": 0,
+        "total_loss": 195.81708673759744,
+        "total_profit": 368.9808206016628,
+        "total_return": 0.17316373386406528,
+        "total_trades": 55,
+        "trades_per_month": 18.758882046423498,
+        "trades_per_year": 228.23306489815255,
+        "var_95": 0.02391619639818443,
+        "win_rate": 0.6727272727272727,
+        "winning_trades": 37
+      },
+      "rank": 3,
+      "score": 0.5906624926205123,
+      "strategy": {
+        "entry_rules": {
+          "conditions": [
+            {
+              "comparison": "LessThan",
+              "indicator": {
+                "name": "stochastic",
+                "params": [
+                  26.0
+                ]
+              },
+              "value": {
+                "Number": 27.459332197288767
+              }
+            },
+            {
+              "comparison": "CrossesAbove",
+              "indicator": {
+                "name": "wma",
+                "params": [
+                  105.0
+                ]
+              },
+              "value": {
+                "Indicator": {
+                  "name": "ema",
+                  "params": [
+                    80.0
+                  ]
+                }
+              }
+            }
+          ],
+          "operator": "And"
+        },
+        "exit_rules": {
+          "conditions": [
+            {
+              "comparison": "LessThan",
+              "indicator": {
+                "name": "bollinger_bands",
+                "params": [
+                  22.0,
+                  3.6
+                ]
+              },
+              "value": "Price"
+            }
+          ],
+          "operator": "Or"
+        },
+        "name": "Strategy_36786",
+        "timeframe": "H1"
+      },
+      "strategy_name": "Strategy_36786",
+      "total_trades": 55
+    },
+    {
+      "metrics": {
+        "annualized_return": 0.5588818194775851,
+        "average_losing_trade_duration_ms": 120960000.0,
+        "average_loss": 22.91488967639267,
+        "average_trade_duration_ms": 151753846.15384614,
+        "average_win": 10.95682784020021,
+        "average_winning_trade_duration_ms": 159085714.2857143,
+        "calmar_ratio": 6.326964689151309,
+        "end_of_data_exits": 1,
+        "entry_signals_count": 814,
+        "expectancy": 4.443036010086195,
+        "largest_loss": 108.08500273769599,
+        "largest_win": 37.822884555044205,
+        "losing_trades": 5,
+        "max_consecutive_losses": 1,
+        "max_consecutive_wins": 14,
+        "max_drawdown": 0.08833332362924137,
+        "max_drawdown_duration": 3,
+        "max_drawdown_percent": 0.08833332362924137,
+        "profit_factor": 2.0082434425268105,
+        "recovery_factor": 2.604831055717636,
+        "return_on_risk": 0.004676880010617049,
+        "sharpe_ratio": 0.21680676398608273,
+        "signal_exits": 25,
+        "sortino_ratio": 0.26610528229865743,
+        "stop_loss_exits": 0,
+        "take_profit_exits": 0,
+        "total_loss": 114.57444838196335,
+        "total_profit": 230.09338464420443,
+        "total_return": 0.1155189362622411,
+        "total_trades": 26,
+        "trades_per_month": 8.678720445062588,
+        "trades_per_year": 105.59109874826149,
+        "var_95": 0.0035434823473837356,
+        "win_rate": 0.8076923076923077,
+        "winning_trades": 21
+      },
+      "rank": 4,
+      "score": 0.5803094307902434,
+      "strategy": {
+        "entry_rules": {
+          "conditions": [
+            {
+              "comparison": "GreaterThan",
+              "indicator": {
+                "name": "sma",
+                "params": [
+                  182.0
+                ]
+              },
+              "value": {
+                "Indicator": {
+                  "name": "ema",
+                  "params": [
+                    186.0
+                  ]
+                }
+              }
+            },
+            {
+              "comparison": "GreaterThan",
+              "indicator": {
+                "name": "vwap",
+                "params": []
+              },
+              "value": "Price"
+            }
+          ],
+          "operator": "And"
+        },
+        "exit_rules": {
+          "conditions": [
+            {
+              "comparison": "CrossesBelow",
+              "indicator": {
+                "name": "vwap",
+                "params": []
+              },
+              "value": "Price"
+            }
+          ],
+          "operator": "Or"
+        },
+        "name": "Strategy_33670",
+        "timeframe": "H1"
+      },
+      "strategy_name": "Strategy_33670",
+      "total_trades": 26
+    },
+    {
+      "metrics": {
+        "annualized_return": 0.5465540275843013,
+        "average_losing_trade_duration_ms": 121800000.0,
+        "average_loss": 26.186276503201327,
+        "average_trade_duration_ms": 68571428.57142857,
+        "average_win": 17.515104535957175,
+        "average_winning_trade_duration_ms": 47280000.0,
+        "calmar_ratio": 9.616873657450064,
+        "end_of_data_exits": 0,
+        "entry_signals_count": 139,
+        "expectancy": 5.028995667626174,
+        "largest_loss": 52.595279802377696,
+        "largest_win": 71.17945908764564,
+        "losing_trades": 6,
+        "max_consecutive_losses": 3,
+        "max_consecutive_wins": 6,
+        "max_drawdown": 0.056832817717314306,
+        "max_drawdown_duration": 10,
+        "max_drawdown_percent": 0.056832817717314306,
+        "profit_factor": 1.672164476478349,
+        "recovery_factor": 4.62279680282889,
+        "return_on_risk": 0.005293679650132813,
+        "sharpe_ratio": 0.16487604437083578,
+        "signal_exits": 21,
+        "sortino_ratio": 0.24799587598300676,
+        "stop_loss_exits": 0,
+        "take_profit_exits": 0,
+        "total_loss": 157.11765901920796,
+        "total_profit": 262.72656803935763,
+        "total_return": 0.1056089090201496,
+        "total_trades": 21,
+        "trades_per_month": 7.4962816063460584,
+        "trades_per_year": 91.20475954387705,
+        "var_95": 0.04532073072027011,
+        "win_rate": 0.7142857142857143,
+        "winning_trades": 15
+      },
+      "rank": 5,
+      "score": 0.5660478217050111,
+      "strategy": {
+        "entry_rules": {
+          "conditions": [
+            {
+              "comparison": "LessThan",
+              "indicator": {
+                "name": "rsi",
+                "params": [
+                  20.0
+                ]
+              },
+              "value": {
+                "Number": 29.76669329215718
+              }
+            }
+          ],
+          "operator": "And"
+        },
+        "exit_rules": {
+          "conditions": [
+            {
+              "comparison": "LessThan",
+              "indicator": {
+                "name": "sma",
+                "params": [
+                  25.0
+                ]
+              },
+              "value": "Price"
+            },
+            {
+              "comparison": "GreaterThan",
+              "indicator": {
+                "name": "stochastic",
+                "params": [
+                  37.0
+                ]
+              },
+              "value": {
+                "Number": 60.924772465451056
+              }
+            }
+          ],
+          "operator": "Or"
+        },
+        "name": "Strategy_16000",
+        "timeframe": "H1"
+      },
+      "strategy_name": "Strategy_16000",
+      "total_trades": 21
+    },
+    {
+      "metrics": {
+        "annualized_return": 0.5727992744493227,
+        "average_losing_trade_duration_ms": 133920000.0,
+        "average_loss": 18.414464013575586,
+        "average_trade_duration_ms": 171450000.0,
+        "average_win": 21.587374273438147,
+        "average_winning_trade_duration_ms": 198257142.85714287,
+        "calmar_ratio": 5.542724108192288,
+        "end_of_data_exits": 1,
+        "entry_signals_count": 256,
+        "expectancy": 4.919941653849094,
+        "largest_loss": 128.8620315407834,
+        "largest_win": 75.64242905939959,
+        "losing_trades": 10,
+        "max_consecutive_losses": 4,
+        "max_consecutive_wins": 6,
+        "max_drawdown": 0.10334255562219138,
+        "max_drawdown_duration": 5,
+        "max_drawdown_percent": 0.10334255562219138,
+        "profit_factor": 1.6412274590524483,
+        "recovery_factor": 2.924480026728077,
+        "return_on_risk": 0.0051788859514200975,
+        "sharpe_ratio": 0.17680484797003937,
+        "signal_exits": 23,
+        "sortino_ratio": 0.2505810233725129,
+        "stop_loss_exits": 0,
+        "take_profit_exits": 0,
+        "total_loss": 184.14464013575585,
+        "total_profit": 302.22323982813407,
+        "total_return": 0.11807859969237822,
+        "total_trades": 24,
+        "trades_per_month": 8.003705419175544,
+        "trades_per_year": 97.37841593330245,
+        "var_95": 0.022776765780300544,
+        "win_rate": 0.5833333333333334,
+        "winning_trades": 14
+      },
+      "rank": 6,
+      "score": 0.5597930247620762,
+      "strategy": {
+        "entry_rules": {
+          "conditions": [
+            {
+              "comparison": "GreaterThan",
+              "indicator": {
+                "name": "vwap",
+                "params": []
+              },
+              "value": "Price"
+            },
+            {
+              "comparison": "GreaterThan",
+              "indicator": {
+                "name": "stochastic",
+                "params": [
+                  19.0
+                ]
+              },
+              "value": {
+                "Number": 76.49772635959334
+              }
+            }
+          ],
+          "operator": "And"
+        },
+        "exit_rules": {
+          "conditions": [
+            {
+              "comparison": "GreaterThan",
+              "indicator": {
+                "name": "rsi",
+                "params": [
+                  22.0
+                ]
+              },
+              "value": {
+                "Number": 74.80285594771658
+              }
+            },
+            {
+              "comparison": "CrossesAbove",
+              "indicator": {
+                "name": "atr",
+                "params": [
+                  50.0
+                ]
+              },
+              "value": "Price"
+            }
+          ],
+          "operator": "Or"
+        },
+        "name": "Strategy_36463",
+        "timeframe": "H1"
+      },
+      "strategy_name": "Strategy_36463",
+      "total_trades": 24
+    },
+    {
+      "metrics": {
+        "annualized_return": 0.6056551845023328,
+        "average_losing_trade_duration_ms": 150960000.0,
+        "average_loss": 12.82021075659036,
+        "average_trade_duration_ms": 151920000.0,
+        "average_win": 20.673037685164605,
+        "average_winning_trade_duration_ms": 152880000.0,
+        "calmar_ratio": 5.202833854460049,
+        "end_of_data_exits": 1,
+        "entry_signals_count": 544,
+        "expectancy": 3.9264134642871227,
+        "largest_loss": 147.2635312307575,
+        "largest_win": 72.68614887594808,
+        "losing_trades": 15,
+        "max_consecutive_losses": 4,
+        "max_consecutive_wins": 3,
+        "max_drawdown": 0.11640871137623282,
+        "max_drawdown_duration": 9,
+        "max_drawdown_percent": 0.11640871137623282,
+        "profit_factor": 1.6125349323557274,
+        "recovery_factor": 2.6638518854077904,
+        "return_on_risk": 0.004133066804512759,
+        "sharpe_ratio": 0.06958021950184864,
+        "signal_exits": 29,
+        "sortino_ratio": 0.086676167194588,
+        "stop_loss_exits": 0,
+        "take_profit_exits": 0,
+        "total_loss": 192.30316134885538,
+        "total_profit": 310.09556527746906,
+        "total_return": 0.11779240392861362,
+        "total_trades": 30,
+        "trades_per_month": 10.485436893203884,
+        "trades_per_year": 127.57281553398059,
+        "var_95": 0.006078819466196189,
+        "win_rate": 0.5,
+        "winning_trades": 15
+      },
+      "rank": 7,
+      "score": 0.5404268457048081,
+      "strategy": {
+        "entry_rules": {
+          "conditions": [
+            {
+              "comparison": "GreaterThan",
+              "indicator": {
+                "name": "vwap",
+                "params": []
+              },
+              "value": "Price"
+            },
+            {
+              "comparison": "LessThan",
+              "indicator": {
                 "name": "ema",
                 "params": [
-                  167.0
+                  28.0
                 ]
               },
               "value": "Price"
@@ -95,100 +654,25 @@
             {
               "comparison": "CrossesAbove",
               "indicator": {
-                "name": "ema",
+                "name": "macd",
                 "params": [
-                  23.0
-                ]
-              },
-              "value": "Price"
-            }
-          ],
-          "operator": "Or"
-        },
-        "name": "Strategy_20496",
-        "timeframe": "H1"
-      },
-      "strategy_name": "Strategy_20496",
-      "total_trades": 12
-    },
-    {
-      "metrics": {
-        "annualized_return": 0.3073553693749551,
-        "average_losing_trade_duration_ms": 33600000.0,
-        "average_loss": 106.64530696007216,
-        "average_trade_duration_ms": 32400000.0,
-        "average_win": 146.11316184801595,
-        "average_winning_trade_duration_ms": 31500000.0,
-        "calmar_ratio": 9.91302763920721,
-        "end_of_data_exits": 0,
-        "entry_signals_count": 42,
-        "expectancy": 37.78810378740675,
-        "largest_loss": 108.77652710676158,
-        "largest_win": 149.39749301662036,
-        "losing_trades": 6,
-        "max_consecutive_losses": 3,
-        "max_consecutive_wins": 4,
-        "max_drawdown": 0.03100519645071178,
-        "max_drawdown_duration": 5,
-        "max_drawdown_percent": 0.03100519645071178,
-        "profit_factor": 1.8267803308365675,
-        "recovery_factor": 3.7700302807057144,
-        "return_on_risk": 0.007467166301254107,
-        "sharpe_ratio": 0.4014730656916006,
-        "signal_exits": 0,
-        "sortino_ratio": 0.7497435316656728,
-        "stop_loss_exits": 6,
-        "take_profit_exits": 8,
-        "total_loss": 639.871841760433,
-        "total_profit": 1168.9052947841276,
-        "total_return": 0.052903345302369474,
-        "total_trades": 14,
-        "trades_per_month": 5.98219584569733,
-        "trades_per_year": 72.78338278931751,
-        "var_95": 0.010484699396671153,
-        "win_rate": 0.5714285714285714,
-        "winning_trades": 8
-      },
-      "rank": 2,
-      "score": 0.6149858411736874,
-      "strategy": {
-        "entry_rules": {
-          "conditions": [
-            {
-              "comparison": "LessThan",
-              "indicator": {
-                "name": "mfi",
-                "params": [
-                  63.0
+                  32.0,
+                  33.0,
+                  45.0
                 ]
               },
               "value": {
-                "Number": 29.547309959437857
+                "Number": 43.739511464019
               }
-            }
-          ],
-          "operator": "And"
-        },
-        "exit_rules": {
-          "conditions": [
-            {
-              "comparison": "LessThan",
-              "indicator": {
-                "name": "wma",
-                "params": [
-                  173.0
-                ]
-              },
-              "value": "Price"
             }
           ],
           "operator": "Or"
         },
-        "name": "Strategy_30143",
+        "name": "Strategy_8543",
         "timeframe": "H1"
       },
-      "strategy_name": "Strategy_30143",
-      "total_trades": 14
+      "strategy_name": "Strategy_8543",
+      "total_trades": 30
     }
   ]
 }
