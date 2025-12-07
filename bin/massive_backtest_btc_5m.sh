@@ -13,9 +13,6 @@ set -e
 # Archivo de datos (CSV o Parquet)
 DATA_FILE="data/BTCUSDT_5m.parquet"
 
-# Guardar resultados en archivo JSON (deja vacío para no guardar)
-OUTPUT_FILE="results/massive_backtest_btcusdt_5m.json"  # Ejemplo: "resultados_backtest.json"
-
 # Fechas del backtest (formato: YYYY-MM-DD, o deja vacío para usar todo el archivo)
 START_DATE="2024-12-01"  # Ejemplo: "2024-01-01"
 END_DATE="2025-03-01"    # Ejemplo: "2024-12-31"
@@ -73,6 +70,16 @@ SHOW_TOP=10
 
 # Modo verbose (true/false)
 VERBOSE=true
+
+# Variables derivadas del archivo de datos
+DATA_BASENAME="$(basename "$DATA_FILE")"
+PAIR="${DATA_BASENAME%%_*}"
+TIMEFRAME="${DATA_BASENAME#*_}"
+TIMEFRAME="${TIMEFRAME%%.*}"
+EXECUTION_DATE="$(date +%Y%m%d_%H%M%S)"
+
+# Guardar resultados en archivo JSON (incluye par, timeframe, fechas y fecha de ejecución)
+OUTPUT_FILE="results/massive_backtest_${PAIR}_${TIMEFRAME}_${START_DATE:-all}_${END_DATE:-all}_${EXECUTION_DATE}.json"
 
 # ============================================================================
 # CÓDIGO DEL SCRIPT (no editar a menos que sepas lo que haces)

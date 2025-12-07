@@ -13,6 +13,7 @@
 
 use clap::Parser;
 use darwinx_generator::{RandomGenerator, GeneticGenerator, GeneticConfig};
+use darwinx_core::TimeFrame;
 use darwinx_data::{CsvLoader, ParquetLoader};
 use darwinx_backtest_engine::{
     PolarsVectorizedBacktestEngine,
@@ -170,6 +171,48 @@ fn format_timestamp(ts: i64) -> String {
     }
 }
 
+/// Detecta timeframe del archivo de datos
+fn detect_timeframe_from_data(path: &str) -> TimeFrame {
+    let lower = path.to_lowercase();
+    if lower.contains("_5m") {
+        TimeFrame::M5
+    } else if lower.contains("_15m") {
+        TimeFrame::M15
+    } else if lower.contains("_30m") {
+        TimeFrame::M30
+    } else if lower.contains("_4h") {
+        TimeFrame::H4
+    } else if lower.contains("_1d") {
+        TimeFrame::D1
+    } else {
+        TimeFrame::H1
+    }
+}
+
+fn timeframe_to_str(tf: TimeFrame) -> &'static str {
+    match tf {
+        TimeFrame::M1 => "1m",
+        TimeFrame::M5 => "5m",
+        TimeFrame::M15 => "15m",
+        TimeFrame::M30 => "30m",
+        TimeFrame::H1 => "1h",
+        TimeFrame::H4 => "4h",
+        TimeFrame::D1 => "1d",
+        TimeFrame::W1 => "1w",
+        TimeFrame::MN1 => "1mo",
+    }
+}
+
+/// Formatea milisegundos a DD:HH:MM:SS (redondeando al segundo más cercano)
+fn format_duration_ms(ms: f64) -> String {
+    let total_seconds = (ms / 1000.0).round().max(0.0) as u64;
+    let days = total_seconds / 86_400;
+    let hours = (total_seconds % 86_400) / 3_600;
+    let minutes = (total_seconds % 3_600) / 60;
+    let seconds = total_seconds % 60;
+    format!("{:02}:{:02}:{:02}:{:02}", days, hours, minutes, seconds)
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = Config::parse();
@@ -202,6 +245,8 @@ async fn main() -> anyhow::Result<()> {
         }
         println!();
     }
+
+    let dataset_timeframe = detect_timeframe_from_data(&config.data);
 
     // ==========================================
     // FASE 1: Generación Masiva de Estrategias
@@ -243,8 +288,16 @@ async fn main() -> anyhow::Result<()> {
                 println!("   🎲 Generando {} estrategias aleatorias...", remaining);
             }
         }
-        let random_strategies = generator.generate_batch(remaining);
+        let mut random_strategies = generator.generate_batch(remaining);
+        for s in random_strategies.iter_mut() {
+            s.timeframe = dataset_timeframe;
+        }
         strategies.extend(random_strategies);
+    }
+
+    // Alinear timeframe principal de estrategias cargadas/generadas al dataset actual
+    for s in strategies.iter_mut() {
+        s.timeframe = dataset_timeframe;
     }
     
     if config.verbose {
@@ -963,16 +1016,7 @@ async fn main() -> anyhow::Result<()> {
                             .map(|d| d.clone())
                             .unwrap_or_else(|| "N/A".to_string());
                         
-                        // Extraer timeframe del nombre del archivo o usar "unknown"
-                        let timeframe = if config.data.contains("_1h") {
-                            "1h"
-                        } else if config.data.contains("_4h") {
-                            "4h"
-                        } else if config.data.contains("_1d") {
-                            "1d"
-                        } else {
-                            "unknown"
-                        };
+                        let timeframe = timeframe_to_str(dataset_timeframe);
 
                         // Calcular score para este resultado
                         let m = &result.metrics;
@@ -1064,20 +1108,7 @@ async fn main() -> anyhow::Result<()> {
         }
         
         // Determinar timeframe del dataset para corregir el AST en el JSON
-        use darwinx_core::TimeFrame;
-        let dataset_timeframe = if config.data.contains("_1h") {
-            TimeFrame::H1
-        } else if config.data.contains("_4h") {
-            TimeFrame::H4
-        } else if config.data.contains("_1d") {
-            TimeFrame::D1
-        } else if config.data.contains("_15m") {
-            TimeFrame::M15
-        } else if config.data.contains("_30m") {
-            TimeFrame::M30
-        } else {
-            TimeFrame::H1 // Default
-        };
+        let dataset_timeframe = detect_timeframe_from_data(&config.data);
         
         // Crear estructura serializable con resultados y scores
         let output_data = serde_json::json!({
@@ -1121,6 +1152,24 @@ async fn main() -> anyhow::Result<()> {
                     weights[2] * pf_norm +
                     weights[3] * return_norm +
                     weights[4] * dd_norm;
+
+                // Métricas con tiempos formateados
+                let mut metrics_value = serde_json::to_value(&r.metrics)
+                    .unwrap_or_else(|_| serde_json::json!({}));
+                if let Some(obj) = metrics_value.as_object_mut() {
+                    obj.insert(
+                        "average_trade_duration".to_string(),
+                        serde_json::json!(format_duration_ms(m.average_trade_duration_ms)),
+                    );
+                    obj.insert(
+                        "average_winning_trade_duration".to_string(),
+                        serde_json::json!(format_duration_ms(m.average_winning_trade_duration_ms)),
+                    );
+                    obj.insert(
+                        "average_losing_trade_duration".to_string(),
+                        serde_json::json!(format_duration_ms(m.average_losing_trade_duration_ms)),
+                    );
+                }
                 
                 // Solo guardar métricas esenciales, NO trades ni equity_curve para reducir tamaño
                 serde_json::json!({
@@ -1128,7 +1177,7 @@ async fn main() -> anyhow::Result<()> {
                     "score": score,
                     "strategy_name": r.strategy_name,
                     "strategy": strategy_ast, // AST necesario para reproducir la estrategia
-                    "metrics": r.metrics,     // Solo métricas, NO incluye trades ni equity_curve
+                    "metrics": metrics_value, // Solo métricas, NO incluye trades ni equity_curve
                     "total_trades": r.trades.len(),
                     // NOTA: trades y equity_curve no se guardan en JSON para reducir tamaño
                     // Los trades completos están disponibles en SQLite si se necesitan

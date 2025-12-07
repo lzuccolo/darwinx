@@ -40,6 +40,14 @@ impl StrategyRepository {
             .await
     }
 
+    /// Busca una estrategia por nombre exacto
+    pub async fn find_by_name(&self, name: &str) -> Result<Option<Strategy>, sqlx::Error> {
+        sqlx::query_as::<_, Strategy>("SELECT * FROM strategies WHERE name = ?")
+            .bind(name)
+            .fetch_optional(&self.pool)
+            .await
+    }
+
     /// Lista estrategias con paginación
     pub async fn list(&self, page: i32, page_size: i32) -> Result<Vec<Strategy>, sqlx::Error> {
         let offset = (page - 1) * page_size;

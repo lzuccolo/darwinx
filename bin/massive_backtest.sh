@@ -68,11 +68,18 @@ SCORE_WEIGHTS="0.3,0.2,0.2,0.15,0.15"
 # Mostrar top N estrategias en consola
 SHOW_TOP=10
 
-# Guardar resultados en archivo JSON (deja vacío para no guardar)
-OUTPUT_FILE="results/massive_backtest_btcusdt_1h.json"  # Ejemplo: "resultados_backtest.json"
-
 # Modo verbose (true/false)
 VERBOSE=true
+
+# Variables derivadas del archivo de datos
+DATA_BASENAME="$(basename "$DATA_FILE")"
+PAIR="${DATA_BASENAME%%_*}"
+TIMEFRAME="${DATA_BASENAME#*_}"
+TIMEFRAME="${TIMEFRAME%%.*}"
+EXECUTION_DATE="$(date +%Y%m%d_%H%M%S)"
+
+# Guardar resultados en archivo JSON (incluye par, timeframe, fechas y fecha de ejecución)
+OUTPUT_FILE="results/massive_backtest_${PAIR}_${TIMEFRAME}_${START_DATE:-all}_${END_DATE:-all}_${EXECUTION_DATE}.json"
 
 # ============================================================================
 # CÓDIGO DEL SCRIPT (no editar a menos que sepas lo que haces)
