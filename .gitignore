@@ -24,4 +24,4 @@ Cargo.lock
 *.sqlite3
 *.zip
 data
-results/massive_backtest_btcusdt_1h.json
+results/*.json
